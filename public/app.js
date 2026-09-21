@@ -118,10 +118,29 @@
 
   /* ---------- Цвет предмета: один предмет — один цвет ---------- */
 
+  /* ---------- Цвет предмета: палитра с макета ----------
+     Один предмет — один цвет. Сначала ищем по ключевым словам,
+     если ничего не подошло — стабильно подбираем из палитры по хешу. */
+
+  const SUBJECT_RULES = [
+    [/граф/i, '#D97757'],                                    // графдизайн
+    [/разраб|проектир|интерфейс|оптимиз/i, '#94A37C'],       // разработка
+    [/язык/i, '#C9A25E'],                                    // иностранный язык
+    [/безопас/i, '#A6808F'],                                 // безопасность
+    [/прав|философ|куратор/i, '#B06A5E'],                    // право / философия
+    [/физ/i, '#9C8877'],                                     // физра / прочее
+  ];
+
+  const SUBJECT_FALLBACK = ['#D97757', '#94A37C', '#C9A25E', '#A6808F', '#B06A5E', '#9C8877'];
+
   function hueFor(text) {
+    const s = String(text || '');
+    for (const [re, color] of SUBJECT_RULES) {
+      if (re.test(s)) return color;
+    }
     let h = 0;
-    for (const ch of text) h = (h * 31 + ch.codePointAt(0)) % 360;
-    return h;
+    for (const ch of s) h = (h * 31 + ch.codePointAt(0)) % 997;
+    return SUBJECT_FALLBACK[h % SUBJECT_FALLBACK.length];
   }
 
   /* ---------- Состояние «сегодня» ---------- */
@@ -233,7 +252,7 @@
     const room = l.room
       ? `<div class="room${l.room.length > 3 ? ' long' : ''}">${esc(l.room)}</div>`
       : '<div class="room none">—</div>';
-    return `<li class="lesson${isNow ? ' now' : ''}" style="--hue:${hueFor(l.subject)}">
+    return `<li class="lesson${isNow ? ' now' : ''}" style="--subj:${hueFor(l.subject)}">
       <div>
         <h3>${esc(l.subject)}</h3>
         ${l.teacher ? `<p class="teacher">${esc(l.teacher)}</p>` : ''}
