@@ -1,0 +1,15 @@
+{
+  "name": "vgppk-schedule",
+  "version": "1.0.0",
+  "description": "Красивое расписание ВГППК",
+  "scripts": {
+    "test": "node test/parse.test.js"
+  },
+  "dependencies": {
+    "cheerio": "^1.2.0"
+  },
+  "private": true,
+  "engines": {
+    "node": ">=20"
+  }
+}
