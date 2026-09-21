@@ -53,7 +53,7 @@ for (const [label, html] of [['table', asTable], ['list', asList]]) {
   assert.strictEqual(w1.length, 7, label);
   assert.deepStrictEqual(w1[0].lessons.map((l) => l.pair), [1, 3, 4], label);
   assert.deepStrictEqual(w1[0].lessons[0], {
-    pair: 1, subject: 'ГрафДизаин и Мультимедиа', room: '132', teacher: 'Семичева А.Г.', note: null,
+    pair: 1, subject: 'ГрафДизаин и Мультимедиа', room: '132', teacher: 'Семичева А.Г.', subgroup: null, note: null,
   }, label);
   assert.strictEqual(w1[0].lessons[2].room, 'СЗ 3', label);
   assert.strictEqual(w1[0].lessons[2].note, '1 подгр.', label);
@@ -77,3 +77,25 @@ console.log('ok: groups');
 const cp1251 = Buffer.from([0xD0, 0xE0, 0xF1, 0xEF, 0xE8, 0xF1, 0xE0, 0xED, 0xE8, 0xE5]);
 assert.strictEqual(new TextDecoder('windows-1251').decode(cp1251), 'Расписание');
 console.log('ok: windows-1251');
+
+// Исправление подгрупп по английскому (данные как на реальном сайте)
+const { applyFixes } = require('../lib/fixes');
+const eng = (j, ba, room, bp, teacher) =>
+  `<a href="j${j}.htm">Ин. язык в ПД</a> <a href="ba${ba}.htm">${room}</a><br><a href="bp${bp}.htm">${teacher}</a>`;
+const engHtml = `<h1>Группа: 841</h1><ul><li>День Пара Неделя 1</li>
+<li>Пн 1</li><li>2</li><li>3</li><li>4</li><li>5 ${eng(10606, 640, '323', 620, 'Яньшина Н.В.')}</li><li>6</li>
+<li>Вт 1 ${eng(10605, 699, '355', 659, 'Рыжкова Н.И.')}</li><li>2</li></ul>
+<p>Обновлено: 21.09.2026 в 18:23.</p>`;
+
+const fixed = applyFixes(parseSchedule(engHtml), 'bg203');
+const mon = fixed.weeks[0].days[0].lessons[0];
+const tue = fixed.weeks[0].days[1].lessons[0];
+assert.deepStrictEqual([mon.subgroup, mon.teacher, mon.room], [2, 'Рыжкова Н.И.', '323']);
+assert.deepStrictEqual([tue.subgroup, tue.teacher, tue.room], [1, 'Яньшина Н.В.', '355']);
+console.log('ok: english subgroups fixed');
+
+// Другая группа не затрагивается; если пара перенесена — правило молча не срабатывает
+const other = applyFixes(parseSchedule(engHtml), 'bg999');
+assert.strictEqual(other.weeks[0].days[0].lessons[0].teacher, 'Яньшина Н.В.');
+assert.strictEqual(other.weeks[0].days[0].lessons[0].subgroup, null);
+console.log('ok: other groups untouched');

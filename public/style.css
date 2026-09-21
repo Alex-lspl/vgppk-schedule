@@ -1,18 +1,18 @@
 /* =========================================================
    Тёплая тёмная тема — палитра:
-   фон #1B1815 · карточка #26211C · карточка↑ #2E2822
+   фон #151515 · карточка #26211C · карточка↑ #2E2822
    граница #3A332B · текст #F2EDE3 · пригл. #A79C8E · акцент #D97757
    ========================================================= */
 
 :root {
-  --bg: #1B1815;
+  --bg: #151515;
   --surface: #26211C;
   --surface-2: #2E2822;
   --line: #3A332B;
   --ink: #F2EDE3;
   --muted: #A79C8E;
   --accent: #D97757;
-  --accent-ink: #1B1815;
+  --accent-ink: #151515;
   --danger: #C2704F;
   --font-body: 'Onest', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   --font-display: 'Unbounded', 'Onest', system-ui, sans-serif;
@@ -125,18 +125,27 @@ button:disabled { cursor: progress; }
 
 /* ---------- Переключатель недель ---------- */
 
-.weeks {
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  margin-bottom: 12px;
+}
+
+.weeks,
+.subgroups {
   display: inline-flex;
   padding: 4px;
-  margin-bottom: 12px;
   border: 1px solid var(--line);
   border-radius: 999px;
   background: var(--surface);
 }
 
-.weeks[hidden] { display: none; }
+.weeks[hidden],
+.subgroups[hidden] { display: none; }
 
-.weeks button {
+.weeks button,
+.subgroups button {
   padding: 8px 18px;
   border: 0;
   border-radius: 999px;
@@ -146,9 +155,11 @@ button:disabled { cursor: progress; }
   transition: color 0.15s ease, background 0.15s ease;
 }
 
-.weeks button:hover { color: var(--ink); }
+.weeks button:hover,
+.subgroups button:hover { color: var(--ink); }
 
-.weeks button[aria-pressed="true"] {
+.weeks button[aria-pressed="true"],
+.subgroups button[aria-pressed="true"] {
   background: var(--accent);
   color: var(--accent-ink);
   font-weight: 600;
@@ -321,6 +332,17 @@ button:disabled { cursor: progress; }
 }
 
 .lesson .note { font-style: italic; }
+
+.lesson .sub-row { margin: 6px 0 0; }
+
+.lesson .sub {
+  display: inline-block;
+  padding: 1px 9px;
+  border: 1px solid color-mix(in srgb, var(--subj) 50%, var(--line));
+  border-radius: 999px;
+  font-size: 12px;
+  color: var(--ink);
+}
 
 .room {
   min-width: 56px;

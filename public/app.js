@@ -69,6 +69,7 @@
     refreshBtn: $('refreshBtn'),
     status: $('status'),
     weeks: $('weeks'),
+    subgroups: $('subgroups'),
     days: $('days'),
     board: $('board'),
     picker: $('picker'),
@@ -88,6 +89,7 @@
 
   let page = new URLSearchParams(location.search).get('page') || store.get('page') || CONFIG.defaultPage;
   let data = null;
+  let mySub = Number(store.get('sub')) || null; // null = показывать всех
   let viewWeek = null;
   let viewDay = null;
   let lastCheck = null;
@@ -182,9 +184,42 @@
     if (viewWeek === null || !nums.includes(viewWeek)) resetView();
 
     renderWeeks(nums);
+    renderSubgroups();
     renderDays();
     renderBoard();
     renderStatus();
+  }
+
+  /* ---------- Подгруппы ---------- */
+
+  function allSubgroups() {
+    const set = new Set();
+    if (data) {
+      for (const w of data.weeks) for (const d of w.days) for (const l of d.lessons) {
+        if (l.subgroup) set.add(l.subgroup);
+      }
+    }
+    return [...set].sort((a, b) => a - b);
+  }
+
+  // Подгруппа, которую реально применяем (сохранённая могла исчезнуть из расписания)
+  function activeSub() {
+    return mySub && allSubgroups().includes(mySub) ? mySub : null;
+  }
+
+  function lessonsOf(day) {
+    const sub = activeSub();
+    return day.lessons.filter((l) => !l.subgroup || !sub || l.subgroup === sub);
+  }
+
+  function renderSubgroups() {
+    const subs = allSubgroups();
+    if (!subs.length) { els.subgroups.hidden = true; return; }
+    const sub = activeSub();
+    els.subgroups.hidden = false;
+    els.subgroups.innerHTML =
+      `<button type="button" data-sub="" aria-pressed="${sub === null}">Все</button>` +
+      subs.map((n) => `<button type="button" data-sub="${n}" aria-pressed="${sub === n}">${n} подгр.</button>`).join('');
   }
 
   function renderWeeks(nums) {
@@ -214,14 +249,14 @@
 
   function visibleDayIndexes() {
     const days = weekDays();
-    return days.map((_, i) => i).filter((i) => i < 6 || days[i].lessons.length > 0);
+    return days.map((_, i) => i).filter((i) => i < 6 || lessonsOf(days[i]).length > 0);
   }
 
   function renderDays() {
     const days = weekDays();
     els.days.innerHTML = visibleDayIndexes().map((i) => {
       const d = dayDate(i);
-      const cls = ['day-chip', days[i].lessons.length ? 'has' : '', isTodayCell(i) ? 'today' : ''].join(' ').trim();
+      const cls = ['day-chip', lessonsOf(days[i]).length ? 'has' : '', isTodayCell(i) ? 'today' : ''].join(' ').trim();
       return `<button type="button" class="${cls}" data-day="${i}" aria-pressed="${i === viewDay}" aria-label="${DAY_FULL[i]}, ${d.getDate()} ${MONTHS[d.getMonth()]}">
         <span class="dow">${days[i].name}</span><span class="dnum">${d.getDate()}</span></button>`;
     }).join('');
@@ -256,6 +291,7 @@
       <div>
         <h3>${esc(l.subject)}</h3>
         ${l.teacher ? `<p class="teacher">${esc(l.teacher)}</p>` : ''}
+        ${l.subgroup && !activeSub() ? `<p class="sub-row"><span class="sub">${l.subgroup} подгруппа</span></p>` : ''}
         ${l.note ? `<p class="note">${esc(l.note)}</p>` : ''}
       </div>${room}</li>`;
   }
@@ -263,7 +299,7 @@
   function dayHtml(day, i) {
     const d = dayDate(i);
     const byPair = new Map();
-    for (const l of day.lessons) {
+    for (const l of lessonsOf(day)) {
       if (!byPair.has(l.pair)) byPair.set(l.pair, []);
       byPair.get(l.pair).push(l);
     }
@@ -379,6 +415,14 @@
   }
 
   /* ---------- События ---------- */
+
+  els.subgroups.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-sub]');
+    if (!b) return;
+    mySub = Number(b.dataset.sub) || null;
+    store.set('sub', mySub || '');
+    render();
+  });
 
   els.weeks.addEventListener('click', (e) => {
     const b = e.target.closest('[data-week]');
