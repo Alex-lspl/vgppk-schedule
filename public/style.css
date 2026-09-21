@@ -1,26 +1,22 @@
+/* =========================================================
+   Тёплая тёмная тема — палитра:
+   фон #1B1815 · карточка #26211C · карточка↑ #2E2822
+   граница #3A332B · текст #F2EDE3 · пригл. #A79C8E · акцент #D97757
+   ========================================================= */
+
 :root {
-  --bg: #E9EEF5;
-  --surface: #FFFFFF;
-  --ink: #101828;
-  --muted: #5B6577;
-  --line: #D5DCE7;
-  --accent: #3F37F0;
-  --accent-ink: #FFFFFF;
+  --bg: #1B1815;
+  --surface: #26211C;
+  --surface-2: #2E2822;
+  --line: #3A332B;
+  --ink: #F2EDE3;
+  --muted: #A79C8E;
+  --accent: #D97757;
+  --accent-ink: #1B1815;
+  --danger: #C2704F;
   --font-body: 'Onest', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   --font-display: 'Unbounded', 'Onest', system-ui, sans-serif;
-  color-scheme: light dark;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #0F131A;
-    --surface: #171C26;
-    --ink: #EEF1F6;
-    --muted: #8B95A7;
-    --line: #262D3A;
-    --accent: #8B85FF;
-    --accent-ink: #0F131A;
-  }
+  color-scheme: dark;
 }
 
 * { box-sizing: border-box; }
@@ -29,16 +25,23 @@ html { -webkit-text-size-adjust: 100%; }
 
 body {
   margin: 0;
-  background: var(--bg);
+  background:
+    radial-gradient(1200px 500px at 85% -10%, rgba(217, 119, 87, 0.07), transparent 60%),
+    var(--bg);
+  background-attachment: fixed;
   color: var(--ink);
   font: 400 16px/1.4 var(--font-body);
+  -webkit-font-smoothing: antialiased;
 }
+
+::selection { background: var(--accent); color: var(--accent-ink); }
 
 button, input { font: inherit; color: inherit; }
 button { cursor: pointer; }
+button:disabled { cursor: progress; }
 
 :focus-visible {
-  outline: 3px solid var(--accent);
+  outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
 
@@ -62,21 +65,25 @@ button { cursor: pointer; }
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 2px;
+  gap: 3px;
   padding: 4px 8px 4px 0;
   border: 0;
   background: none;
   text-align: left;
+  border-radius: 12px;
 }
 
+.group:hover .group-hint { color: var(--accent); }
+
 .group-num {
-  font: 700 clamp(34px, 9vw, 52px)/1 var(--font-display);
+  font: 700 clamp(32px, 8.5vw, 50px)/1 var(--font-display);
   letter-spacing: -0.02em;
 }
 
 .group-hint {
   font-size: 13px;
   color: var(--muted);
+  transition: color 0.15s ease;
 }
 
 .refresh {
@@ -89,9 +96,15 @@ button { cursor: pointer; }
   border-radius: 999px;
   background: var(--surface);
   font-weight: 500;
+  transition: background 0.15s ease, border-color 0.15s ease;
 }
 
-.refresh:disabled { opacity: 0.6; cursor: progress; }
+.refresh:hover:not(:disabled) {
+  background: var(--surface-2);
+  border-color: var(--accent);
+}
+
+.refresh:disabled { opacity: 0.6; }
 
 .refresh.loading svg { animation: spin 0.9s linear infinite; }
 
@@ -108,8 +121,7 @@ button { cursor: pointer; }
 
 .status b { color: var(--ink); font-weight: 600; }
 
-.status.error { color: #C2410C; }
-@media (prefers-color-scheme: dark) { .status.error { color: #FDBA74; } }
+.status.error { color: #E89B7D; }
 
 /* ---------- Переключатель недель ---------- */
 
@@ -131,14 +143,18 @@ button { cursor: pointer; }
   background: none;
   font-weight: 500;
   color: var(--muted);
+  transition: color 0.15s ease, background 0.15s ease;
 }
+
+.weeks button:hover { color: var(--ink); }
 
 .weeks button[aria-pressed="true"] {
-  background: var(--ink);
-  color: var(--bg);
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-weight: 600;
 }
 
-/* ---------- Полоса дней ---------- */
+/* ---------- Полоса дней (мобильная) ---------- */
 
 .days {
   display: flex;
@@ -153,7 +169,7 @@ button { cursor: pointer; }
 
 .day-chip {
   position: relative;
-  flex: 1 0 52px;
+  flex: 1 0 54px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -162,6 +178,7 @@ button { cursor: pointer; }
   border: 1px solid var(--line);
   border-radius: 12px;
   background: var(--surface);
+  transition: border-color 0.15s ease, background 0.15s ease;
 }
 
 .day-chip .dow { font-size: 12px; color: var(--muted); }
@@ -222,7 +239,7 @@ button { cursor: pointer; }
   background: var(--accent);
   color: var(--accent-ink);
   font-size: 12px;
-  font-weight: 500;
+  font-weight: 600;
   vertical-align: 3px;
 }
 
@@ -261,16 +278,27 @@ button { cursor: pointer; }
 
 .items { display: grid; gap: 6px; }
 
+/* ---------- Карточка пары ----------
+   Паттерн с палитры: тёмная карточка + тонкая граница +
+   цветная полоса слева, номер аудитории — акцентом. */
+
 .lesson {
-  --hue: 230;
+  --subj: #9C8877;
   display: grid;
   grid-template-columns: 1fr auto;
   gap: 4px 12px;
   align-items: center;
   padding: 12px 14px 12px 16px;
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--subj);
   border-radius: 14px;
-  border-left: 5px solid hsl(var(--hue) 65% 52%);
-  background: color-mix(in srgb, hsl(var(--hue) 70% 50%) 9%, var(--surface));
+  background: var(--surface);
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.lesson:hover {
+  background: var(--surface-2);
+  border-color: color-mix(in srgb, var(--subj) 45%, var(--line));
 }
 
 .lesson.now {
@@ -300,19 +328,20 @@ button { cursor: pointer; }
   text-align: right;
   font: 700 26px/1 var(--font-display);
   letter-spacing: -0.02em;
+  color: var(--subj);
   overflow-wrap: anywhere;
 }
 
 .room.long { font-size: 15px; line-height: 1.15; }
 .room.none { color: var(--muted); font-weight: 500; }
 
+/* ---------- Окна и обед ---------- */
+
 .gap {
   display: grid;
   grid-template-columns: 56px 1fr;
   gap: 10px;
 }
-
-.gap.lunch p { border-style: solid; }
 
 .gap p {
   grid-column: 2;
@@ -323,6 +352,14 @@ button { cursor: pointer; }
   font-size: 13px;
   color: var(--muted);
 }
+
+.gap.lunch p {
+  border-style: solid;
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--line));
+  color: var(--ink);
+}
+
+/* ---------- Пустой день ---------- */
 
 .empty {
   margin: 0;
@@ -345,7 +382,7 @@ button { cursor: pointer; }
   width: min(440px, calc(100vw - 24px));
   max-height: min(620px, 82vh);
   padding: 0;
-  border: 0;
+  border: 1px solid var(--line);
   border-radius: 22px;
   background: var(--surface);
   color: var(--ink);
@@ -354,7 +391,7 @@ button { cursor: pointer; }
 
 .picker[open] { display: flex; flex-direction: column; }
 
-.picker::backdrop { background: rgb(0 0 0 / 0.5); }
+.picker::backdrop { background: rgb(0 0 0 / 0.6); }
 
 .picker-head {
   display: flex;
@@ -370,7 +407,12 @@ button { cursor: pointer; }
   border: 1px solid var(--line);
   border-radius: 12px;
   background: var(--bg);
+  color: var(--ink);
 }
+
+.picker-head input::placeholder { color: var(--muted); }
+
+.picker-head input:focus { border-color: var(--accent); outline: none; }
 
 .picker-close {
   padding: 0 12px;
@@ -378,6 +420,8 @@ button { cursor: pointer; }
   background: none;
   color: var(--muted);
 }
+
+.picker-close:hover { color: var(--ink); }
 
 .picker-list {
   margin: 0;
@@ -395,13 +439,15 @@ button { cursor: pointer; }
   text-align: left;
 }
 
-.picker-list button:hover { background: var(--bg); }
+.picker-list button:hover { background: var(--surface-2); }
 .picker-list button[aria-current="true"] { font-weight: 600; color: var(--accent); }
 .picker-list .msg { padding: 16px; color: var(--muted); }
 
 /* ---------- Широкие экраны: все дни сразу ---------- */
 
 @media (min-width: 900px) {
+  .app { padding-top: 28px; }
+
   .days { display: none; }
 
   .board {
@@ -424,4 +470,5 @@ button { cursor: pointer; }
 
 @media (prefers-reduced-motion: reduce) {
   .refresh.loading svg { animation: none; }
+  * { transition: none !important; }
 }
