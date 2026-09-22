@@ -2,6 +2,7 @@
 
 const { fetchHtml } = require('../lib/fetchPage');
 const { parseSchedule } = require('../lib/parse');
+const { applyFixes } = require('../lib/fixes');
 
 // GET /api/schedule?page=bg203
 // Ответ кэшируется на CDN Vercel на 10 минут: сайт колледжа опрашивается
@@ -16,7 +17,7 @@ module.exports = async (req, res) => {
 
   try {
     const html = await fetchHtml(`${page}.htm`);
-    const data = parseSchedule(html);
+    const data = applyFixes(parseSchedule(html), page);
     data.page = page;
     data.fetchedAt = new Date().toISOString();
 
