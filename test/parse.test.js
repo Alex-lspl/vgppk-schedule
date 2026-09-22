@@ -63,6 +63,16 @@ for (const [label, html] of [['table', asTable], ['list', asList]]) {
   console.log(`ok: ${label}`);
 }
 
+// Реальный баг: на сайте ДВА <h1> — сначала название всего сайта, потом «Группа: 841».
+// Раньше парсер брал первый попавшийся и показывал вместо номера группы название сайта.
+const twoH1 = `<h1><a href="https://rasp.vgppk.ru">Расписание занятий ГБПОУ ВО "ВГППК"</a></h1>
+<h3>Основное расписание</h3>
+<h1>Группа: 841</h1>
+<ul><li>День Пара Неделя 1</li><li>Пн 1 ${lesson(1, 'А', 1, '132', 1, 'Т')}</li></ul>
+<p>Обновлено: 21.09.2026 в 18:23.</p>`;
+assert.strictEqual(parseSchedule(twoH1).name, '841', 'два h1 на странице: имя группы не должно теряться');
+console.log('ok: two h1 tags (real site bug)');
+
 // Битая страница -> понятная ошибка
 assert.throws(() => parseSchedule('<html><body><p>Ошибка 500</p></body></html>'), /Не удалось найти расписание/);
 console.log('ok: broken page');
