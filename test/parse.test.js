@@ -90,9 +90,11 @@ const engHtml = `<h1>Группа: 841</h1><ul><li>День Пара Недел�
 const fixed = applyFixes(parseSchedule(engHtml), 'bg203');
 const mon = fixed.weeks[0].days[0].lessons[0];
 const tue = fixed.weeks[0].days[1].lessons[0];
-assert.deepStrictEqual([mon.subgroup, mon.teacher, mon.room], [2, 'Рыжкова Н.И.', '323']);
-assert.deepStrictEqual([tue.subgroup, tue.teacher, tue.room], [1, 'Яньшина Н.В.', '355']);
-console.log('ok: english subgroups fixed');
+// Яньшина Н.В. всегда с кабинетом 323 (1 подгруппа), Рыжкова Н.И. всегда с 355 (2 подгруппа) —
+// педагог и кабинет должны переставляться вместе, а не по отдельности.
+assert.deepStrictEqual([mon.subgroup, mon.teacher, mon.room], [2, 'Рыжкова Н.И.', '355']);
+assert.deepStrictEqual([tue.subgroup, tue.teacher, tue.room], [1, 'Яньшина Н.В.', '323']);
+console.log('ok: english subgroups fixed (teacher stays with own room)');
 
 // Другая группа не затрагивается; если пара перенесена — правило молча не срабатывает
 const other = applyFixes(parseSchedule(engHtml), 'bg999');
