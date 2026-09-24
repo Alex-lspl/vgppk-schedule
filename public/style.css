@@ -1,52 +1,44 @@
-/* =========================================================
-   Тёплая тёмная тема — палитра:
-   фон #151515 · карточка #26211C · карточка↑ #2E2822
-   граница #3A332B · текст #F2EDE3 · пригл. #A79C8E · акцент #D97757
-   ========================================================= */
-
 :root {
-  --bg: #151515;
-  --surface: #26211C;
-  --surface-2: #2E2822;
-  --line: #3A332B;
-  --ink: #F2EDE3;
-  --muted: #A79C8E;
-  --accent: #D97757;
-  --accent-ink: #151515;
-  --danger: #C2704F;
+  --bg: #E9EEF5;
+  --surface: #FFFFFF;
+  --ink: #101828;
+  --muted: #5B6577;
+  --line: #D5DCE7;
+  --accent: #3F37F0;
+  --accent-ink: #FFFFFF;
   --font-body: 'Onest', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   --font-display: 'Unbounded', 'Onest', system-ui, sans-serif;
-  color-scheme: dark;
+  color-scheme: light dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0F131A;
+    --surface: #171C26;
+    --ink: #EEF1F6;
+    --muted: #8B95A7;
+    --line: #262D3A;
+    --accent: #8B85FF;
+    --accent-ink: #0F131A;
+  }
 }
 
 * { box-sizing: border-box; }
 
-html {
-  -webkit-text-size-adjust: 100%;
-  overflow-x: hidden; /* страховка: горизонтальной прокрутки быть не должно */
-}
+html { -webkit-text-size-adjust: 100%; }
 
 body {
   margin: 0;
-  overflow-x: hidden;
-  overflow-wrap: break-word;
-  background:
-    radial-gradient(1200px 500px at 85% -10%, rgba(217, 119, 87, 0.07), transparent 60%),
-    var(--bg);
-  background-attachment: fixed;
+  background: var(--bg);
   color: var(--ink);
   font: 400 16px/1.4 var(--font-body);
-  -webkit-font-smoothing: antialiased;
 }
-
-::selection { background: var(--accent); color: var(--accent-ink); }
 
 button, input { font: inherit; color: inherit; }
 button { cursor: pointer; }
-button:disabled { cursor: progress; }
 
 :focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 3px solid var(--accent);
   outline-offset: 2px;
 }
 
@@ -58,173 +50,86 @@ button:disabled { cursor: progress; }
 
 /* ---------- Шапка ---------- */
 
-/* Шапка — одна невысокая строка: номер группы (нажать — сменить) слева,
-   кнопка обновления справа. Раньше номер группы выводился огромным
-   заголовком на всю ширину; теперь он умеренного размера и не вырастает
-   в несколько строк, чтобы расписание начиналось сразу под ним. */
-
 .top {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
-  padding: 2px 0 10px;
+  gap: 12px;
+  padding: 4px 0 8px;
 }
 
 .group {
-  min-width: 0;
-  display: inline-flex;
-  align-items: baseline;
-  gap: 8px;
-  padding: 6px 4px;
-  margin: -6px 0 -6px -4px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 4px 8px 4px 0;
   border: 0;
-  border-radius: 10px;
   background: none;
   text-align: left;
 }
 
 .group-num {
-  font: 700 clamp(22px, 6vw, 30px)/1.1 var(--font-display);
-  letter-spacing: -0.01em;
-  overflow-wrap: anywhere;
+  font: 700 clamp(34px, 9vw, 52px)/1 var(--font-display);
+  letter-spacing: -0.02em;
 }
 
 .group-hint {
-  flex-shrink: 0;
-  padding: 3px 10px;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  font-size: 12px;
+  font-size: 13px;
   color: var(--muted);
-  transition: color 0.15s ease, border-color 0.15s ease;
 }
-
-.group:hover .group-hint { color: var(--accent); border-color: var(--accent); }
 
 .refresh {
-  flex-shrink: 0;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 44px;
-  min-height: 44px;
-  padding: 0 16px;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
   border: 1px solid var(--line);
-  border-radius: 999px;
+  border-radius: 50%;
   background: var(--surface);
-  font-weight: 500;
-  transition: background 0.15s ease, border-color 0.15s ease;
 }
-
-/* На узких экранах кнопке некогда объяснять себя словами — оставляем только иконку */
-@media (max-width: 420px) {
-  .refresh { padding: 0; justify-content: center; }
-  .refresh-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
-}
-
-.refresh:hover:not(:disabled) {
-  background: var(--surface-2);
-  border-color: var(--accent);
-}
-
-.refresh:disabled { opacity: 0.6; }
 
 .refresh.loading svg { animation: spin 0.9s linear infinite; }
 
 @keyframes spin { to { transform: rotate(360deg); } }
 
 .status {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  max-width: 100%;
   margin: 0 0 16px;
-  padding: 0;
-  border: 0;
-  background: none;
   font-size: 13px;
   color: var(--muted);
-  text-align: left;
 }
 
-.status span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.status-i {
-  flex-shrink: 0;
-  opacity: 0.7;
-  transition: opacity 0.15s ease, color 0.15s ease;
-}
-
-.status:hover .status-i { opacity: 1; color: var(--accent); }
-
-.status b { color: var(--ink); font-weight: 600; }
-
-.status.error { color: #E89B7D; }
-.status.error .status-i { opacity: 0.9; }
-
-.info-body {
-  padding: 16px;
-  overflow-y: auto;
-  font-size: 14px;
-  line-height: 1.5;
-  color: var(--ink);
-}
-
-.info-body p { margin: 0 0 12px; }
-.info-body p:last-child { margin-bottom: 0; }
-.info-body b { color: var(--accent); }
+.status.error { color: #C2410C; }
+@media (prefers-color-scheme: dark) { .status.error { color: #FDBA74; } }
 
 /* ---------- Переключатель недель ---------- */
 
-.controls {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px 12px;
-  margin-bottom: 12px;
-}
-
-.weeks,
-.subgroups {
+.weeks {
   display: inline-flex;
-  flex-wrap: wrap;
-  max-width: 100%;
   padding: 4px;
+  margin-bottom: 12px;
   border: 1px solid var(--line);
   border-radius: 999px;
   background: var(--surface);
 }
 
-.weeks[hidden],
-.subgroups[hidden] { display: none; }
+.weeks[hidden] { display: none; }
 
-.weeks button,
-.subgroups button {
-  white-space: nowrap;
+.weeks button {
   padding: 8px 18px;
   border: 0;
   border-radius: 999px;
   background: none;
   font-weight: 500;
   color: var(--muted);
-  transition: color 0.15s ease, background 0.15s ease;
 }
 
-.weeks button:hover,
-.subgroups button:hover { color: var(--ink); }
-
-.weeks button[aria-pressed="true"],
-.subgroups button[aria-pressed="true"] {
-  background: var(--accent);
-  color: var(--accent-ink);
-  font-weight: 600;
+.weeks button[aria-pressed="true"] {
+  background: var(--ink);
+  color: var(--bg);
 }
 
-/* ---------- Полоса дней (мобильная) ---------- */
+/* ---------- Полоса дней ---------- */
 
 .days {
   display: flex;
@@ -239,7 +144,7 @@ button:disabled { cursor: progress; }
 
 .day-chip {
   position: relative;
-  flex: 1 0 54px;
+  flex: 1 0 52px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -248,7 +153,6 @@ button:disabled { cursor: progress; }
   border: 1px solid var(--line);
   border-radius: 12px;
   background: var(--surface);
-  transition: border-color 0.15s ease, background 0.15s ease;
 }
 
 .day-chip .dow { font-size: 12px; color: var(--muted); }
@@ -291,34 +195,25 @@ button:disabled { cursor: progress; }
   justify-content: space-between;
   gap: 4px 12px;
   margin: 0 0 10px;
-  max-width: 100%;
 }
 
 .day-title h2 {
   margin: 0;
-  min-width: 0;
   font-size: 20px;
   font-weight: 600;
-  overflow-wrap: anywhere;
 }
 
 .day-title .meta { font-size: 13px; color: var(--muted); }
 
-.day.today .day-title h2 {
-  display: inline;
-  overflow-wrap: anywhere;
-}
-
 .day.today .day-title h2::after {
   content: 'сегодня';
-  display: inline-block;
   margin-left: 10px;
   padding: 2px 9px;
   border-radius: 999px;
   background: var(--accent);
   color: var(--accent-ink);
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 500;
   vertical-align: 3px;
 }
 
@@ -332,7 +227,7 @@ button:disabled { cursor: progress; }
 
 .slot {
   display: grid;
-  grid-template-columns: 56px minmax(0, 1fr);
+  grid-template-columns: 56px 1fr;
   gap: 10px;
   align-items: start;
 }
@@ -355,29 +250,18 @@ button:disabled { cursor: progress; }
   color: var(--muted);
 }
 
-.items { display: grid; gap: 6px; min-width: 0; }
-
-/* ---------- Карточка пары ----------
-   Паттерн с палитры: тёмная карточка + тонкая граница +
-   цветная полоса слева, номер аудитории — акцентом. */
+.items { display: grid; gap: 6px; }
 
 .lesson {
-  --subj: #9C8877;
+  --hue: 230;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: 1fr auto;
   gap: 4px 12px;
   align-items: center;
   padding: 12px 14px 12px 16px;
-  border: 1px solid var(--line);
-  border-left: 4px solid var(--subj);
   border-radius: 14px;
-  background: var(--surface);
-  transition: background 0.15s ease, border-color 0.15s ease;
-}
-
-.lesson:hover {
-  background: var(--surface-2);
-  border-color: color-mix(in srgb, var(--subj) 45%, var(--line));
+  border-left: 5px solid hsl(var(--hue) 65% 52%);
+  background: color-mix(in srgb, hsl(var(--hue) 70% 50%) 9%, var(--surface));
 }
 
 .lesson.now {
@@ -390,8 +274,6 @@ button:disabled { cursor: progress; }
   font-size: 16px;
   font-weight: 600;
   line-height: 1.3;
-  overflow-wrap: anywhere;
-  hyphens: auto;
 }
 
 .lesson .teacher,
@@ -403,71 +285,33 @@ button:disabled { cursor: progress; }
 
 .lesson .note { font-style: italic; }
 
-.lesson .sub-row { margin: 6px 0 0; }
-
-.lesson .sub {
-  display: inline-block;
-  padding: 1px 9px;
-  border: 1px solid color-mix(in srgb, var(--subj) 50%, var(--line));
-  border-radius: 999px;
-  font-size: 12px;
-  color: var(--ink);
-}
-
 .room {
   min-width: 56px;
   max-width: 96px;
   text-align: right;
   font: 700 26px/1 var(--font-display);
   letter-spacing: -0.02em;
-  color: var(--subj);
   overflow-wrap: anywhere;
 }
 
 .room.long { font-size: 15px; line-height: 1.15; }
 .room.none { color: var(--muted); font-weight: 500; }
 
-/* ---------- Окна и обед ---------- */
-
 .gap {
   display: grid;
-  grid-template-columns: 56px minmax(0, 1fr);
+  grid-template-columns: 56px 1fr;
   gap: 10px;
 }
 
 .gap p {
   grid-column: 2;
   margin: 0;
-  padding: 10px 14px;
+  padding: 8px 14px;
   border: 1px dashed var(--line);
   border-radius: 14px;
   font-size: 13px;
   color: var(--muted);
 }
-
-/* Обед — такая же карточка, как у пары, чтобы не выглядела «незаметнее» пар вокруг неё */
-.gap.lunch p {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--line));
-  background: color-mix(in srgb, var(--accent) 10%, var(--surface));
-  font-size: 14px;
-  font-weight: 500;
-  color: var(--ink);
-}
-
-.gap.lunch p::before {
-  content: '';
-  width: 4px;
-  align-self: stretch;
-  margin: -10px 0;
-  margin-left: -14px;
-  border-radius: 14px 0 0 14px;
-  background: var(--accent);
-}
-
-/* ---------- Пустой день ---------- */
 
 .empty {
   margin: 0;
@@ -480,33 +324,27 @@ button:disabled { cursor: progress; }
 
 /* ---------- Выбор группы ---------- */
 
-.picker,
-.info {
+.picker {
   width: min(440px, calc(100vw - 24px));
   max-height: min(620px, 82vh);
   padding: 0;
-  border: 1px solid var(--line);
+  border: 0;
   border-radius: 22px;
   background: var(--surface);
   color: var(--ink);
   overflow: hidden;
 }
 
-.picker[open],
-.info[open] { display: flex; flex-direction: column; }
+.picker[open] { display: flex; flex-direction: column; }
 
-.picker::backdrop,
-.info::backdrop { background: rgb(0 0 0 / 0.6); }
+.picker::backdrop { background: rgb(0 0 0 / 0.5); }
 
 .picker-head {
   display: flex;
-  align-items: center;
   gap: 8px;
   padding: 14px;
   border-bottom: 1px solid var(--line);
 }
-
-.picker-head strong { flex: 1; font-size: 15px; }
 
 .picker-head input {
   flex: 1;
@@ -515,12 +353,7 @@ button:disabled { cursor: progress; }
   border: 1px solid var(--line);
   border-radius: 12px;
   background: var(--bg);
-  color: var(--ink);
 }
-
-.picker-head input::placeholder { color: var(--muted); }
-
-.picker-head input:focus { border-color: var(--accent); outline: none; }
 
 .picker-close {
   padding: 0 12px;
@@ -528,8 +361,6 @@ button:disabled { cursor: progress; }
   background: none;
   color: var(--muted);
 }
-
-.picker-close:hover { color: var(--ink); }
 
 .picker-list {
   margin: 0;
@@ -547,20 +378,18 @@ button:disabled { cursor: progress; }
   text-align: left;
 }
 
-.picker-list button:hover { background: var(--surface-2); }
+.picker-list button:hover { background: var(--bg); }
 .picker-list button[aria-current="true"] { font-weight: 600; color: var(--accent); }
 .picker-list .msg { padding: 16px; color: var(--muted); }
 
 /* ---------- Широкие экраны: все дни сразу ---------- */
 
 @media (min-width: 900px) {
-  .app { padding-top: 28px; }
-
   .days { display: none; }
 
   .board {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(3, 1fr);
     gap: 28px 24px;
     align-items: start;
   }
@@ -569,26 +398,13 @@ button:disabled { cursor: progress; }
   .day.hidden-desktop { display: none; }
 
   .slot,
-  .gap { grid-template-columns: 44px minmax(0, 1fr); }
+  .gap { grid-template-columns: 44px 1fr; }
 
   .lesson h3 { font-size: 15px; }
   .room { font-size: 22px; }
   .room.long { font-size: 14px; }
 }
 
-@media (max-width: 400px) {
-  .weeks button,
-  .subgroups button { padding: 8px 12px; }
-
-  .refresh { padding: 0 14px; }
-
-  .slot,
-  .gap { grid-template-columns: 48px minmax(0, 1fr); gap: 8px; }
-
-  .lesson { padding: 12px 12px 12px 14px; }
-}
-
 @media (prefers-reduced-motion: reduce) {
   .refresh.loading svg { animation: none; }
-  * { transition: none !important; }
 }
