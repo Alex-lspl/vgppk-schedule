@@ -8,61 +8,20 @@
     // Группа по умолчанию (страница вида bg203.htm на сайте колледжа)
     defaultPage: 'bg203',
 
-    // Как часто само приложение проверяет сайт колледжа, пока страница открыта.
-    // Значения те же, что и в lib/refreshWindow.js на сервере — если меняешь
-    // одно, поменяй и другое, иначе кэш сервера и опрос приложения разъедутся.
-    peakStartHourMsk: 6, // с 6:00 МСК…
-    peakEndHourMsk: 17, // …до 17:00 МСК — учебные часы, проверяем чаще
-    peakRefreshMs: 30 * 60 * 1000, // раз в 30 минут
-    offPeakRefreshMs: 2 * 60 * 60 * 1000, // в остальное время — раз в 2 часа
+    // Как часто обновлять данные, пока страница открыта
+    refreshMs: 10 * 60 * 1000,
 
     // Какая из недель расписания приходится на НЕЧЁТНЫЕ недели года (по ISO-нумерации).
     // Если приложение показывает не ту неделю — поменяй 1 на 2 (или наоборот).
-    oddIsoWeekIs: 2,
+    oddIsoWeekIs: 1,
 
-    // Звонки — см. TIMETABLE ниже.
+    // Время пар: на сайте его нет. Заполни по звонкам колледжа — тогда
+    // под номером пары появится время, а текущая пара подсветится.
+    // Пример: 1: ['08:30', '10:00'], 2: ['10:10', '11:40'],
+    pairTimes: {},
   };
 
   /* ========================================================= */
-
-
-  /* =========================================================
-     ЗВОНКИ. Каждая пара — две половины по 45 минут.
-     Ключ — номер пары так, как он указан на сайте колледжа.
-     В понедельник слот 3 занят кураторским часом, поэтому
-     «3 пара» и «4 пара» по звонкам — это слоты 4 и 5 на сайте.
-     ========================================================= */
-  const FIRST_HALF = {
-    1: [['08:30', '09:15'], ['09:20', '10:05']],
-    2: [['10:15', '11:00'], ['11:05', '11:50']],
-  };
-
-  const MONDAY = {
-    slots: {
-      ...FIRST_HALF,
-      3: [['12:00', '12:45']], // кураторский час
-      4: [['13:30', '14:15'], ['14:20', '15:05']],
-      5: [['15:15', '16:00'], ['16:05', '16:50']],
-    },
-    lunch: { after: 3, time: ['12:45', '13:30'] },
-  };
-
-  const TUE_FRI = {
-    slots: {
-      ...FIRST_HALF,
-      3: [['12:30', '13:15'], ['13:20', '14:05']],
-      4: [['14:15', '15:00'], ['15:05', '15:50']],
-    },
-    lunch: { after: 2, time: ['11:50', '12:30'] },
-  };
-
-  // Пн … Вс. Для субботы звонков нет — время просто не показывается.
-  const TIMETABLE = [MONDAY, TUE_FRI, TUE_FRI, TUE_FRI, TUE_FRI, null, null];
-
-  function pairRange(dayIdx, pair) {
-    const slots = TIMETABLE[dayIdx]?.slots[pair];
-    return slots ? [slots[0][0], slots[slots.length - 1][1]] : null;
-  }
 
   const DAY_FULL = ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота', 'Воскресенье'];
   const MONTHS = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
@@ -72,19 +31,14 @@
     groupName: $('groupName'),
     groupBtn: $('groupBtn'),
     refreshBtn: $('refreshBtn'),
-    statusBtn: $('statusBtn'),
-    statusText: $('statusText'),
+    status: $('status'),
     weeks: $('weeks'),
-    subgroups: $('subgroups'),
     days: $('days'),
     board: $('board'),
     picker: $('picker'),
     pickerSearch: $('pickerSearch'),
     pickerList: $('pickerList'),
     pickerClose: $('pickerClose'),
-    infoDialog: $('infoDialog'),
-    infoBody: $('infoBody'),
-    infoClose: $('infoClose'),
   };
 
   const store = {
@@ -98,7 +52,6 @@
 
   let page = new URLSearchParams(location.search).get('page') || store.get('page') || CONFIG.defaultPage;
   let data = null;
-  let mySub = Number(store.get('sub')) || null; // null = показывать всех
   let viewWeek = null;
   let viewDay = null;
   let lastCheck = null;
@@ -129,29 +82,10 @@
 
   /* ---------- Цвет предмета: один предмет — один цвет ---------- */
 
-  /* ---------- Цвет предмета: палитра с макета ----------
-     Один предмет — один цвет. Сначала ищем по ключевым словам,
-     если ничего не подошло — стабильно подбираем из палитры по хешу. */
-
-  const SUBJECT_RULES = [
-    [/граф/i, '#D97757'],                                    // графдизайн
-    [/разраб|проектир|интерфейс|оптимиз/i, '#94A37C'],       // разработка
-    [/язык/i, '#C9A25E'],                                    // иностранный язык
-    [/безопас/i, '#A6808F'],                                 // безопасность
-    [/прав|философ|куратор/i, '#B06A5E'],                    // право / философия
-    [/физ/i, '#9C8877'],                                     // физра / прочее
-  ];
-
-  const SUBJECT_FALLBACK = ['#D97757', '#94A37C', '#C9A25E', '#A6808F', '#B06A5E', '#9C8877'];
-
   function hueFor(text) {
-    const s = String(text || '');
-    for (const [re, color] of SUBJECT_RULES) {
-      if (re.test(s)) return color;
-    }
     let h = 0;
-    for (const ch of s) h = (h * 31 + ch.codePointAt(0)) % 997;
-    return SUBJECT_FALLBACK[h % SUBJECT_FALLBACK.length];
+    for (const ch of text) h = (h * 31 + ch.codePointAt(0)) % 360;
+    return h;
   }
 
   /* ---------- Состояние «сегодня» ---------- */
@@ -193,42 +127,9 @@
     if (viewWeek === null || !nums.includes(viewWeek)) resetView();
 
     renderWeeks(nums);
-    renderSubgroups();
     renderDays();
     renderBoard();
     renderStatus();
-  }
-
-  /* ---------- Подгруппы ---------- */
-
-  function allSubgroups() {
-    const set = new Set();
-    if (data) {
-      for (const w of data.weeks) for (const d of w.days) for (const l of d.lessons) {
-        if (l.subgroup) set.add(l.subgroup);
-      }
-    }
-    return [...set].sort((a, b) => a - b);
-  }
-
-  // Подгруппа, которую реально применяем (сохранённая могла исчезнуть из расписания)
-  function activeSub() {
-    return mySub && allSubgroups().includes(mySub) ? mySub : null;
-  }
-
-  function lessonsOf(day) {
-    const sub = activeSub();
-    return day.lessons.filter((l) => !l.subgroup || !sub || l.subgroup === sub);
-  }
-
-  function renderSubgroups() {
-    const subs = allSubgroups();
-    if (!subs.length) { els.subgroups.hidden = true; return; }
-    const sub = activeSub();
-    els.subgroups.hidden = false;
-    els.subgroups.innerHTML =
-      `<button type="button" data-sub="" aria-pressed="${sub === null}">Все</button>` +
-      subs.map((n) => `<button type="button" data-sub="${n}" aria-pressed="${sub === n}">${n} подгр.</button>`).join('');
   }
 
   function renderWeeks(nums) {
@@ -258,14 +159,14 @@
 
   function visibleDayIndexes() {
     const days = weekDays();
-    return days.map((_, i) => i).filter((i) => i < 6 || lessonsOf(days[i]).length > 0);
+    return days.map((_, i) => i).filter((i) => i < 6 || days[i].lessons.length > 0);
   }
 
   function renderDays() {
     const days = weekDays();
     els.days.innerHTML = visibleDayIndexes().map((i) => {
       const d = dayDate(i);
-      const cls = ['day-chip', lessonsOf(days[i]).length ? 'has' : '', isTodayCell(i) ? 'today' : ''].join(' ').trim();
+      const cls = ['day-chip', days[i].lessons.length ? 'has' : '', isTodayCell(i) ? 'today' : ''].join(' ').trim();
       return `<button type="button" class="${cls}" data-day="${i}" aria-pressed="${i === viewDay}" aria-label="${DAY_FULL[i]}, ${d.getDate()} ${MONTHS[d.getMonth()]}">
         <span class="dow">${days[i].name}</span><span class="dnum">${d.getDate()}</span></button>`;
     }).join('');
@@ -274,13 +175,11 @@
     if (active && active.scrollIntoView) active.scrollIntoView({ block: 'nearest', inline: 'center' });
   }
 
-  function currentPairNow(dayIdx) {
+  function currentPairNow() {
     const { now } = todayState();
     const mins = now.getHours() * 60 + now.getMinutes();
-    const slots = TIMETABLE[dayIdx]?.slots || {};
-    for (const pair of Object.keys(slots)) {
-      const [from, to] = pairRange(dayIdx, pair);
-      if (mins >= toMinutes(from) && mins < toMinutes(to)) return Number(pair);
+    for (const [pair, range] of Object.entries(CONFIG.pairTimes)) {
+      if (mins >= toMinutes(range[0]) && mins < toMinutes(range[1])) return Number(pair);
     }
     return null;
   }
@@ -294,13 +193,12 @@
 
   function lessonHtml(l, isNow) {
     const room = l.room
-      ? `<div class="room${l.room.length > 3 ? ' long' : ''}">${esc(l.room)}</div>`
+      ? `<div class="room${l.room.length > 4 ? ' long' : ''}">${esc(l.room)}</div>`
       : '<div class="room none">—</div>';
-    return `<li class="lesson${isNow ? ' now' : ''}" style="--subj:${hueFor(l.subject)}">
+    return `<li class="lesson${isNow ? ' now' : ''}" style="--hue:${hueFor(l.subject)}">
       <div>
         <h3>${esc(l.subject)}</h3>
         ${l.teacher ? `<p class="teacher">${esc(l.teacher)}</p>` : ''}
-        ${l.subgroup && !activeSub() ? `<p class="sub-row"><span class="sub">${l.subgroup} подгруппа</span></p>` : ''}
         ${l.note ? `<p class="note">${esc(l.note)}</p>` : ''}
       </div>${room}</li>`;
   }
@@ -308,13 +206,12 @@
   function dayHtml(day, i) {
     const d = dayDate(i);
     const byPair = new Map();
-    for (const l of lessonsOf(day)) {
+    for (const l of day.lessons) {
       if (!byPair.has(l.pair)) byPair.set(l.pair, []);
       byPair.get(l.pair).push(l);
     }
     const pairs = [...byPair.keys()].sort((a, b) => a - b);
-    const nowPair = isTodayCell(i) ? currentPairNow(i) : null;
-    const lunch = TIMETABLE[i]?.lunch;
+    const nowPair = isTodayCell(i) ? currentPairNow() : null;
 
     let body;
     let meta = '';
@@ -324,18 +221,13 @@
       meta = `${pluralPairs(pairs.length)}, с ${pairs[0]} по ${pairs[pairs.length - 1]}`;
       const rows = [];
       pairs.forEach((p, k) => {
-        if (k > 0) {
-          const prev = pairs[k - 1];
-          if (p - prev > 1) {
-            rows.push(`<li class="gap"><p>Окно · ${pluralPairs(p - prev - 1)}</p></li>`);
-          } else if (lunch && prev <= lunch.after && p > lunch.after) {
-            rows.push(`<li class="gap lunch"><p>Обед · ${esc(lunch.time[0])}–${esc(lunch.time[1])}</p></li>`);
-          }
+        if (k > 0 && p - pairs[k - 1] > 1) {
+          const gapN = p - pairs[k - 1] - 1;
+          rows.push(`<li class="gap"><p>Окно · ${pluralPairs(gapN)}</p></li>`);
         }
-        const t = pairRange(i, p);
-        const halves = (TIMETABLE[i]?.slots[p] || []).map((h) => `${h[0]}–${h[1]}`).join(', ');
+        const t = CONFIG.pairTimes[p];
         rows.push(`<li class="slot">
-          <div class="pair"${halves ? ` title="${esc(halves)}"` : ''}><b>${p}</b>${t ? `<span>${esc(t[0])}<br>${esc(t[1])}</span>` : ''}</div>
+          <div class="pair"><b>${p}</b>${t ? `<span>${esc(t[0])}<br>${esc(t[1])}</span>` : ''}</div>
           <ul class="items slots">${byPair.get(p).map((l) => lessonHtml(l, nowPair === p)).join('')}</ul>
         </li>`);
       });
@@ -357,52 +249,23 @@
     els.board.innerHTML = visibleDayIndexes().map((i) => dayHtml(days[i], i)).join('');
   }
 
-  // Строка статуса умещается в одну строку (при нехватке места обрезается многоточием),
-  // а полное объяснение — в диалоге по нажатию (см. renderInfoDialog).
-  let lastProblem = null;
-
   function renderStatus(err) {
-    lastProblem = err || null;
-    els.statusBtn.classList.toggle('error', !!err);
-
     if (err) {
-      els.statusText.textContent = data ? `${err} Показываю сохранённое.` : err;
+      els.status.className = 'status error';
+      els.status.textContent = data
+        ? `${err} Показываю сохранённое расписание.`
+        : err;
       return;
     }
+    els.status.className = 'status';
     if (!data) return;
-
     const parts = [];
-    parts.push(data.updated ? `Обновлено ${data.updated}` : 'Дата обновления на сайте неизвестна');
-    if (lastCheck) {
-      parts.push(`проверено в ${pad(lastCheck.getHours())}:${pad(lastCheck.getMinutes())}`);
-    } else if (data.fetchedAt) {
-      const f = new Date(data.fetchedAt);
-      parts.push(`сохранено в ${pad(f.getHours())}:${pad(f.getMinutes())}`);
-    }
-    els.statusText.textContent = parts.join(' · ');
-  }
-
-  function renderInfoDialog() {
-    const rows = [];
-    if (lastProblem) {
-      rows.push(`<p><b>Не получилось проверить сайт колледжа.</b> ${esc(lastProblem)}</p>`);
-    }
-    rows.push(`<p><b>«Обновлено»</b> — дата и время, когда колледж в последний раз менял расписание на своём сайте. Это время задаёт сам сайт колледжа, и оно не зависит от приложения: если колледж давно не трогал расписание, дата не изменится, даже если приложение проверяло сайт только что.</p>`);
-    if (lastCheck) {
-      rows.push(`<p><b>«Проверено»</b> — когда приложение в последний раз заходило на сайт колледжа и сверяло данные: сегодня в ${pad(lastCheck.getHours())}:${pad(lastCheck.getMinutes())}.</p>`);
-    }
-    rows.push(`<p>Приложение само проверяет сайт по расписанию — чаще в учебные часы, реже ночью. Кнопка «Обновить» рядом с номером группы проверяет сайт прямо сейчас, в обход расписания.</p>`);
-    els.infoBody.innerHTML = rows.join('');
+    if (data.updated) parts.push(`На сайте колледжа обновлено ${data.updated}`);
+    if (lastCheck) parts.push(`проверено в ${pad(lastCheck.getHours())}:${pad(lastCheck.getMinutes())}`);
+    els.status.textContent = parts.join(', ');
   }
 
   /* ---------- Загрузка ---------- */
-
-  // Московское время не переводится, поэтому МСК = UTC+3 круглый год.
-  function autoRefreshMs() {
-    const mskHour = (new Date().getUTCHours() + 3) % 24;
-    const peak = mskHour >= CONFIG.peakStartHourMsk && mskHour < CONFIG.peakEndHourMsk;
-    return peak ? CONFIG.peakRefreshMs : CONFIG.offPeakRefreshMs;
-  }
 
   function readCache() {
     const raw = store.get(`sched:${page}`);
@@ -414,49 +277,24 @@
     if (loading) return;
     loading = true;
     els.refreshBtn.classList.add('loading');
-    els.refreshBtn.disabled = true;
-    let json = null;
-    let problem = null;
     try {
-      let res;
-      try {
-        // t — «ведро времени»: меняет адрес запроса, и сервер не отдаёт устаревший кэш.
-        // Ручное обновление — не чаще раза в минуту на всех, автоматическое — раз в 30 минут
-        // или раз в 2 часа в зависимости от времени суток (см. autoRefreshMs).
-        const bucket = Math.floor(Date.now() / (manual ? 60000 : autoRefreshMs()));
-        res = await fetch(`/api/schedule?page=${encodeURIComponent(page)}&t=${bucket}${manual ? 'm' : ''}`, { cache: 'no-cache' });
-      } catch {
-        throw new Error('Нет связи с сервером.');
-      }
-      const body = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(body.error ? `${body.error}.` : `Ошибка сервера ${res.status}.`);
-      if (!Array.isArray(body.weeks)) throw new Error('Сервер вернул неожиданный ответ.');
-      json = body;
+      const res = await fetch(`/api/schedule?page=${encodeURIComponent(page)}`, { cache: 'no-cache' });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json.error || `Ошибка сервера ${res.status}.`);
+      data = json;
+      lastCheck = new Date();
+      store.set(`sched:${page}`, JSON.stringify(json));
+      render();
     } catch (e) {
-      problem = e.message;
+      const msg = e instanceof TypeError ? 'Нет связи с сервером.' : `${e.message}`;
+      renderStatus(msg.endsWith('.') ? msg : `${msg}.`);
+    } finally {
+      loading = false;
+      els.refreshBtn.classList.remove('loading');
     }
-
-    loading = false;
-    els.refreshBtn.classList.remove('loading');
-    els.refreshBtn.disabled = false;
-
-    if (problem) { renderStatus(problem); return; }
-
-    data = json;
-    lastCheck = new Date();
-    store.set(`sched:${page}`, JSON.stringify(json));
-    render();
   }
 
   /* ---------- События ---------- */
-
-  els.subgroups.addEventListener('click', (e) => {
-    const b = e.target.closest('[data-sub]');
-    if (!b) return;
-    mySub = Number(b.dataset.sub) || null;
-    store.set('sub', mySub || '');
-    render();
-  });
 
   els.weeks.addEventListener('click', (e) => {
     const b = e.target.closest('[data-week]');
@@ -475,22 +313,11 @@
 
   els.refreshBtn.addEventListener('click', () => load({ manual: true }));
 
-  // Не setInterval с одним фиксированным числом: интервал должен подстраиваться
-  // при переходе через границу учебных часов, поэтому таймер сам себя переназначает.
-  let autoRefreshTimer = null;
-  function scheduleAutoRefresh() {
-    clearTimeout(autoRefreshTimer);
-    autoRefreshTimer = setTimeout(async () => {
-      await load();
-      scheduleAutoRefresh();
-    }, autoRefreshMs());
-  }
-  scheduleAutoRefresh();
+  setInterval(() => load(), CONFIG.refreshMs);
 
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible' && (!lastCheck || Date.now() - lastCheck > autoRefreshMs())) {
+    if (document.visibilityState === 'visible' && (!lastCheck || Date.now() - lastCheck > CONFIG.refreshMs)) {
       load();
-      scheduleAutoRefresh();
     }
   });
 
@@ -539,20 +366,11 @@
     viewWeek = null;
     els.board.innerHTML = '';
     els.days.innerHTML = '';
-    els.statusText.textContent = 'Загружаю расписание…';
+    els.status.textContent = 'Загружаю расписание…';
     const cached = readCache();
     if (cached) { data = cached; render(); }
     load();
   });
-
-  /* ---------- Пояснение про время обновления ---------- */
-
-  els.statusBtn.addEventListener('click', () => {
-    renderInfoDialog();
-    els.infoDialog.showModal();
-  });
-  els.infoClose.addEventListener('click', () => els.infoDialog.close());
-  els.infoDialog.addEventListener('click', (e) => { if (e.target === els.infoDialog) els.infoDialog.close(); });
 
   /* ---------- Старт: сначала кэш (мгновенно), потом свежие данные ---------- */
 
