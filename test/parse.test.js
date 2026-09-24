@@ -83,6 +83,18 @@ const groups = parseGroups(`<a href="bg.htm">По группам</a>
 assert.deepStrictEqual(groups, [{ page: 'bg10', name: '101' }, { page: 'bg203', name: '841' }]);
 console.log('ok: groups');
 
+// Окно проверок по московскому времени (МСК = UTC+3 круглый год)
+const { isPeakHour, refreshIntervalSeconds } = require('../lib/refreshWindow');
+const atUtc = (h, m = 0) => new Date(Date.UTC(2026, 8, 24, h, m));
+assert.strictEqual(isPeakHour(atUtc(2, 59)), false, '05:59 МСК — ещё не пик'); // 05:59 МСК
+assert.strictEqual(isPeakHour(atUtc(3, 0)), true, '06:00 МСК — начало пика'); // 06:00 МСК
+assert.strictEqual(isPeakHour(atUtc(13, 59)), true, '16:59 МСК — ещё пик'); // 16:59 МСК
+assert.strictEqual(isPeakHour(atUtc(14, 0)), false, '17:00 МСК — уже не пик'); // 17:00 МСК
+assert.strictEqual(isPeakHour(atUtc(21, 0)), false, '00:00 МСК следующих суток — ночь'); // 00:00 МСК (перевал через полночь)
+assert.strictEqual(refreshIntervalSeconds(atUtc(3, 0)), 30 * 60);
+assert.strictEqual(refreshIntervalSeconds(atUtc(21, 0)), 2 * 60 * 60);
+console.log('ok: MSK peak/off-peak window');
+
 // windows-1251 действительно декодируется в этой версии Node
 const cp1251 = Buffer.from([0xD0, 0xE0, 0xF1, 0xEF, 0xE8, 0xF1, 0xE0, 0xED, 0xE8, 0xE5]);
 assert.strictEqual(new TextDecoder('windows-1251').decode(cp1251), 'Расписание');
@@ -100,11 +112,11 @@ const engHtml = `<h1>Группа: 841</h1><ul><li>День Пара Недел�
 const fixed = applyFixes(parseSchedule(engHtml), 'bg203');
 const mon = fixed.weeks[0].days[0].lessons[0];
 const tue = fixed.weeks[0].days[1].lessons[0];
-// Яньшина Н.В. всегда с кабинетом 323 (1 подгруппа), Рыжкова Н.И. всегда с 355 (2 подгруппа) —
-// педагог и кабинет должны переставляться вместе, а не по отдельности.
-assert.deepStrictEqual([mon.subgroup, mon.teacher, mon.room], [2, 'Рыжкова Н.И.', '355']);
-assert.deepStrictEqual([tue.subgroup, tue.teacher, tue.room], [1, 'Яньшина Н.В.', '323']);
-console.log('ok: english subgroups fixed (teacher stays with own room)');
+// Дни и преподаватели на сайте верные — исправление только добавляет номер подгруппы,
+// ничего не переставляя между Пн и Вт.
+assert.deepStrictEqual([mon.subgroup, mon.teacher, mon.room], [1, 'Яньшина Н.В.', '323']);
+assert.deepStrictEqual([tue.subgroup, tue.teacher, tue.room], [2, 'Рыжкова Н.И.', '355']);
+console.log('ok: english subgroups labeled (days/teachers left as on site)');
 
 // Другая группа не затрагивается; если пара перенесена — правило молча не срабатывает
 const other = applyFixes(parseSchedule(engHtml), 'bg999');

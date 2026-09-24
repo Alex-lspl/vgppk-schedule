@@ -3,10 +3,13 @@
 const { fetchHtml } = require('../lib/fetchPage');
 const { parseSchedule } = require('../lib/parse');
 const { applyFixes } = require('../lib/fixes');
+const { refreshIntervalSeconds } = require('../lib/refreshWindow');
 
 // GET /api/schedule?page=bg203
-// Ответ кэшируется на CDN Vercel на 10 минут: сайт колледжа опрашивается
-// не чаще, чем раз в 10 минут, сколько бы людей ни открыло приложение.
+// Ответ кэшируется на CDN Vercel. Длительность кэша зависит от московского времени
+// (см. lib/refreshWindow.js): в учебные часы — 30 минут, в остальное время — 2 часа.
+// Сайт колледжа опрашивается не чаще, чем раз в этот промежуток, сколько бы людей
+// ни открыло приложение одновременно.
 module.exports = async (req, res) => {
   const page = String(req.query.page || 'bg203');
 
@@ -21,7 +24,8 @@ module.exports = async (req, res) => {
     data.page = page;
     data.fetchedAt = new Date().toISOString();
 
-    res.setHeader('Cache-Control', 'public, s-maxage=600, stale-while-revalidate=3600');
+    const maxAge = refreshIntervalSeconds();
+    res.setHeader('Cache-Control', `public, s-maxage=${maxAge}, stale-while-revalidate=${maxAge * 4}`);
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.status(200).json(data);
   } catch (e) {

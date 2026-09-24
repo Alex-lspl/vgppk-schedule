@@ -135,17 +135,49 @@ button:disabled { cursor: progress; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
 .status {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
   margin: 0 0 16px;
+  padding: 0;
+  border: 0;
+  background: none;
   font-size: 13px;
   color: var(--muted);
+  text-align: left;
 }
+
+.status span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.status-i {
+  flex-shrink: 0;
+  opacity: 0.7;
+  transition: opacity 0.15s ease, color 0.15s ease;
+}
+
+.status:hover .status-i { opacity: 1; color: var(--accent); }
 
 .status b { color: var(--ink); font-weight: 600; }
 
 .status.error { color: #E89B7D; }
+.status.error .status-i { opacity: 0.9; }
+
+.info-body {
+  padding: 16px;
+  overflow-y: auto;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--ink);
+}
+
+.info-body p { margin: 0 0 12px; }
+.info-body p:last-child { margin-bottom: 0; }
+.info-body b { color: var(--accent); }
 
 /* ---------- Переключатель недель ---------- */
 
@@ -406,17 +438,33 @@ button:disabled { cursor: progress; }
 .gap p {
   grid-column: 2;
   margin: 0;
-  padding: 8px 14px;
+  padding: 10px 14px;
   border: 1px dashed var(--line);
   border-radius: 14px;
   font-size: 13px;
   color: var(--muted);
 }
 
+/* Обед — такая же карточка, как у пары, чтобы не выглядела «незаметнее» пар вокруг неё */
 .gap.lunch p {
-  border-style: solid;
-  border-color: color-mix(in srgb, var(--accent) 35%, var(--line));
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--line));
+  background: color-mix(in srgb, var(--accent) 10%, var(--surface));
+  font-size: 14px;
+  font-weight: 500;
   color: var(--ink);
+}
+
+.gap.lunch p::before {
+  content: '';
+  width: 4px;
+  align-self: stretch;
+  margin: -10px 0;
+  margin-left: -14px;
+  border-radius: 14px 0 0 14px;
+  background: var(--accent);
 }
 
 /* ---------- Пустой день ---------- */
@@ -432,7 +480,8 @@ button:disabled { cursor: progress; }
 
 /* ---------- Выбор группы ---------- */
 
-.picker {
+.picker,
+.info {
   width: min(440px, calc(100vw - 24px));
   max-height: min(620px, 82vh);
   padding: 0;
@@ -443,16 +492,21 @@ button:disabled { cursor: progress; }
   overflow: hidden;
 }
 
-.picker[open] { display: flex; flex-direction: column; }
+.picker[open],
+.info[open] { display: flex; flex-direction: column; }
 
-.picker::backdrop { background: rgb(0 0 0 / 0.6); }
+.picker::backdrop,
+.info::backdrop { background: rgb(0 0 0 / 0.6); }
 
 .picker-head {
   display: flex;
+  align-items: center;
   gap: 8px;
   padding: 14px;
   border-bottom: 1px solid var(--line);
 }
+
+.picker-head strong { flex: 1; font-size: 15px; }
 
 .picker-head input {
   flex: 1;

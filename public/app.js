@@ -8,8 +8,13 @@
     // Группа по умолчанию (страница вида bg203.htm на сайте колледжа)
     defaultPage: 'bg203',
 
-    // Как часто обновлять данные, пока страница открыта
-    refreshMs: 10 * 60 * 1000,
+    // Как часто само приложение проверяет сайт колледжа, пока страница открыта.
+    // Значения те же, что и в lib/refreshWindow.js на сервере — если меняешь
+    // одно, поменяй и другое, иначе кэш сервера и опрос приложения разъедутся.
+    peakStartHourMsk: 6, // с 6:00 МСК…
+    peakEndHourMsk: 17, // …до 17:00 МСК — учебные часы, проверяем чаще
+    peakRefreshMs: 30 * 60 * 1000, // раз в 30 минут
+    offPeakRefreshMs: 2 * 60 * 60 * 1000, // в остальное время — раз в 2 часа
 
     // Какая из недель расписания приходится на НЕЧЁТНЫЕ недели года (по ISO-нумерации).
     // Если приложение показывает не ту неделю — поменяй 1 на 2 (или наоборот).
@@ -67,7 +72,8 @@
     groupName: $('groupName'),
     groupBtn: $('groupBtn'),
     refreshBtn: $('refreshBtn'),
-    status: $('status'),
+    statusBtn: $('statusBtn'),
+    statusText: $('statusText'),
     weeks: $('weeks'),
     subgroups: $('subgroups'),
     days: $('days'),
@@ -76,6 +82,9 @@
     pickerSearch: $('pickerSearch'),
     pickerList: $('pickerList'),
     pickerClose: $('pickerClose'),
+    infoDialog: $('infoDialog'),
+    infoBody: $('infoBody'),
+    infoClose: $('infoClose'),
   };
 
   const store = {
@@ -348,28 +357,52 @@
     els.board.innerHTML = visibleDayIndexes().map((i) => dayHtml(days[i], i)).join('');
   }
 
+  // Строка статуса умещается в одну строку (при нехватке места обрезается многоточием),
+  // а полное объяснение — в диалоге по нажатию (см. renderInfoDialog).
+  let lastProblem = null;
+
   function renderStatus(err) {
+    lastProblem = err || null;
+    els.statusBtn.classList.toggle('error', !!err);
+
     if (err) {
-      els.status.className = 'status error';
-      els.status.textContent = data ? `${err} Показываю сохранённое расписание.` : err;
+      els.statusText.textContent = data ? `${err} Показываю сохранённое.` : err;
       return;
     }
-    els.status.className = 'status';
     if (!data) return;
-    const rows = [];
-    rows.push(data.updated
-      ? `<span>Расписание на сайте колледжа обновлено: <b>${esc(data.updated)}</b></span>`
-      : '<span>Время обновления на сайте колледжа неизвестно</span>');
+
+    const parts = [];
+    parts.push(data.updated ? `Обновлено ${data.updated}` : 'Дата обновления на сайте неизвестна');
     if (lastCheck) {
-      rows.push(`<span>Приложение проверило сайт в <b>${pad(lastCheck.getHours())}:${pad(lastCheck.getMinutes())}</b></span>`);
+      parts.push(`проверено в ${pad(lastCheck.getHours())}:${pad(lastCheck.getMinutes())}`);
     } else if (data.fetchedAt) {
       const f = new Date(data.fetchedAt);
-      rows.push(`<span>Сохранено на телефоне в <b>${pad(f.getHours())}:${pad(f.getMinutes())}</b>, идёт проверка…</span>`);
+      parts.push(`сохранено в ${pad(f.getHours())}:${pad(f.getMinutes())}`);
     }
-    els.status.innerHTML = rows.join('');
+    els.statusText.textContent = parts.join(' · ');
+  }
+
+  function renderInfoDialog() {
+    const rows = [];
+    if (lastProblem) {
+      rows.push(`<p><b>Не получилось проверить сайт колледжа.</b> ${esc(lastProblem)}</p>`);
+    }
+    rows.push(`<p><b>«Обновлено»</b> — дата и время, когда колледж в последний раз менял расписание на своём сайте. Это время задаёт сам сайт колледжа, и оно не зависит от приложения: если колледж давно не трогал расписание, дата не изменится, даже если приложение проверяло сайт только что.</p>`);
+    if (lastCheck) {
+      rows.push(`<p><b>«Проверено»</b> — когда приложение в последний раз заходило на сайт колледжа и сверяло данные: сегодня в ${pad(lastCheck.getHours())}:${pad(lastCheck.getMinutes())}.</p>`);
+    }
+    rows.push(`<p>Приложение само проверяет сайт по расписанию — чаще в учебные часы, реже ночью. Кнопка «Обновить» рядом с номером группы проверяет сайт прямо сейчас, в обход расписания.</p>`);
+    els.infoBody.innerHTML = rows.join('');
   }
 
   /* ---------- Загрузка ---------- */
+
+  // Московское время не переводится, поэтому МСК = UTC+3 круглый год.
+  function autoRefreshMs() {
+    const mskHour = (new Date().getUTCHours() + 3) % 24;
+    const peak = mskHour >= CONFIG.peakStartHourMsk && mskHour < CONFIG.peakEndHourMsk;
+    return peak ? CONFIG.peakRefreshMs : CONFIG.offPeakRefreshMs;
+  }
 
   function readCache() {
     const raw = store.get(`sched:${page}`);
@@ -388,8 +421,9 @@
       let res;
       try {
         // t — «ведро времени»: меняет адрес запроса, и сервер не отдаёт устаревший кэш.
-        // Ручное обновление — не чаще раза в минуту на всех, автоматическое — раз в 10 минут.
-        const bucket = Math.floor(Date.now() / (manual ? 60000 : CONFIG.refreshMs));
+        // Ручное обновление — не чаще раза в минуту на всех, автоматическое — раз в 30 минут
+        // или раз в 2 часа в зависимости от времени суток (см. autoRefreshMs).
+        const bucket = Math.floor(Date.now() / (manual ? 60000 : autoRefreshMs()));
         res = await fetch(`/api/schedule?page=${encodeURIComponent(page)}&t=${bucket}${manual ? 'm' : ''}`, { cache: 'no-cache' });
       } catch {
         throw new Error('Нет связи с сервером.');
@@ -441,11 +475,22 @@
 
   els.refreshBtn.addEventListener('click', () => load({ manual: true }));
 
-  setInterval(() => load(), CONFIG.refreshMs);
+  // Не setInterval с одним фиксированным числом: интервал должен подстраиваться
+  // при переходе через границу учебных часов, поэтому таймер сам себя переназначает.
+  let autoRefreshTimer = null;
+  function scheduleAutoRefresh() {
+    clearTimeout(autoRefreshTimer);
+    autoRefreshTimer = setTimeout(async () => {
+      await load();
+      scheduleAutoRefresh();
+    }, autoRefreshMs());
+  }
+  scheduleAutoRefresh();
 
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible' && (!lastCheck || Date.now() - lastCheck > CONFIG.refreshMs)) {
+    if (document.visibilityState === 'visible' && (!lastCheck || Date.now() - lastCheck > autoRefreshMs())) {
       load();
+      scheduleAutoRefresh();
     }
   });
 
@@ -494,11 +539,20 @@
     viewWeek = null;
     els.board.innerHTML = '';
     els.days.innerHTML = '';
-    els.status.textContent = 'Загружаю расписание…';
+    els.statusText.textContent = 'Загружаю расписание…';
     const cached = readCache();
     if (cached) { data = cached; render(); }
     load();
   });
+
+  /* ---------- Пояснение про время обновления ---------- */
+
+  els.statusBtn.addEventListener('click', () => {
+    renderInfoDialog();
+    els.infoDialog.showModal();
+  });
+  els.infoClose.addEventListener('click', () => els.infoDialog.close());
+  els.infoDialog.addEventListener('click', (e) => { if (e.target === els.infoDialog) els.infoDialog.close(); });
 
   /* ---------- Старт: сначала кэш (мгновенно), потом свежие данные ---------- */
 
