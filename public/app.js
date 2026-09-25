@@ -156,8 +156,18 @@
 
   /* ---------- Состояние «сегодня» ---------- */
 
+  // Текущий момент времени как «настенные часы» в Москве, независимо от часового
+  // пояса устройства: epoch-время абсолютно и от часового пояса не зависит, поэтому
+  // просто сдвигаем его на +3 часа и читаем UTC-компоненты — это и есть время в Москве.
+  // Дальше с этим объектом можно работать как с обычной локальной датой
+  // (getHours, getDay, getDate...) — все они уже вернут московские значения.
+  function mskNow() {
+    const s = new Date(Date.now() + 3 * 3600000);
+    return new Date(s.getUTCFullYear(), s.getUTCMonth(), s.getUTCDate(), s.getUTCHours(), s.getUTCMinutes(), s.getUTCSeconds());
+  }
+
   function todayState() {
-    const now = new Date();
+    const now = mskNow();
     const cur = currentWeekNumber(now);
     const idx = (now.getDay() + 6) % 7;
     return { now, cur, idx };
@@ -285,6 +295,14 @@
     return null;
   }
 
+  function isLunchNow(dayIdx) {
+    const lunch = TIMETABLE[dayIdx]?.lunch;
+    if (!lunch) return false;
+    const { now } = todayState();
+    const mins = now.getHours() * 60 + now.getMinutes();
+    return mins >= toMinutes(lunch.time[0]) && mins < toMinutes(lunch.time[1]);
+  }
+
   function pluralPairs(n) {
     const m10 = n % 10, m100 = n % 100;
     if (m10 === 1 && m100 !== 11) return `${n} пара`;
@@ -313,8 +331,10 @@
       byPair.get(l.pair).push(l);
     }
     const pairs = [...byPair.keys()].sort((a, b) => a - b);
-    const nowPair = isTodayCell(i) ? currentPairNow(i) : null;
+    const isToday = isTodayCell(i);
+    const nowPair = isToday ? currentPairNow(i) : null;
     const lunch = TIMETABLE[i]?.lunch;
+    const lunchNow = isToday && isLunchNow(i);
 
     let body;
     let meta = '';
@@ -329,7 +349,7 @@
           if (p - prev > 1) {
             rows.push(`<li class="gap"><p>Окно · ${pluralPairs(p - prev - 1)}</p></li>`);
           } else if (lunch && prev <= lunch.after && p > lunch.after) {
-            rows.push(`<li class="gap lunch"><p>Обед · ${esc(lunch.time[0])}–${esc(lunch.time[1])}</p></li>`);
+            rows.push(`<li class="gap lunch${lunchNow ? ' now' : ''}"><p>Обед · ${esc(lunch.time[0])}–${esc(lunch.time[1])}</p></li>`);
           }
         }
         const t = pairRange(i, p);

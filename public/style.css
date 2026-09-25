@@ -445,8 +445,9 @@ button:disabled { cursor: progress; }
   color: var(--muted);
 }
 
-/* Обед — такая же карточка, как у пары, чтобы не выглядела «незаметнее» пар вокруг неё */
-.gap.lunch p {
+/* Обед выглядит как обычное окно, и только пока идёт прямо сейчас (по МСК) —
+   становится такой же цветной карточкой, как у текущей пары. */
+.gap.lunch.now p {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -457,7 +458,7 @@ button:disabled { cursor: progress; }
   color: var(--ink);
 }
 
-.gap.lunch p::before {
+.gap.lunch.now p::before {
   content: '';
   width: 4px;
   align-self: stretch;
@@ -592,3 +593,19 @@ button:disabled { cursor: progress; }
   .refresh.loading svg { animation: none; }
   * { transition: none !important; }
 }
+
+/* ---------- Подвал ---------- */
+
+.site-footer {
+  margin: 32px 0 0;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+  font-size: 13px;
+}
+
+.site-footer a {
+  color: var(--muted);
+  text-decoration: none;
+}
+
+.site-footer a:hover { color: var(--accent); }
