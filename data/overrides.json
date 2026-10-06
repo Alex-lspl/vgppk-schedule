@@ -1,0 +1,41 @@
+{
+  "bg203": {
+    "weekKey": "2026-W41",
+    "days": {
+      "4": [
+        {
+          "pair": 1,
+          "subject": "Прав обесп",
+          "teacher": "Паткович Старый хрен",
+          "room": "231",
+          "subgroup": null,
+          "note": "Тест"
+        },
+        {
+          "pair": 2,
+          "subject": "Проектирование и разработка интерфейсов пользователя",
+          "teacher": "Алябьев Д.А.",
+          "room": "кф з",
+          "subgroup": null,
+          "note": null
+        },
+        {
+          "pair": 3,
+          "subject": "Обеспечение безопасности веб-приложений",
+          "teacher": "Семичев Е.А.",
+          "room": "129",
+          "subgroup": null,
+          "note": null
+        },
+        {
+          "pair": 4,
+          "subject": "Основы философии",
+          "teacher": "Недорезов Н.С.",
+          "room": "341",
+          "subgroup": null,
+          "note": null
+        }
+      ]
+    }
+  }
+}
