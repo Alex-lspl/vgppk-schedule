@@ -277,6 +277,26 @@ button:disabled { cursor: progress; }
 .day-chip[aria-pressed="true"] .dnum { color: var(--accent-ink); }
 .day-chip[aria-pressed="true"].has::after { background: var(--accent-ink); }
 
+/* Разделитель между днями этой и следующей недели в сплошной прокручиваемой полосе */
+.day-sep {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 2px;
+  color: var(--muted);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.day-sep::before {
+  content: '';
+  width: 1px;
+  align-self: stretch;
+  margin: 10px 0;
+  background: var(--line);
+}
+
 /* ---------- День ---------- */
 
 .board { display: block; }

@@ -254,31 +254,59 @@
     return w.days;
   }
 
-  function dayDate(i) {
+  function daysOfWeek(weekNumber) {
+    const w = data.weeks.find((x) => x.number === weekNumber);
+    return w ? w.days : [];
+  }
+
+  function dayDateFor(weekNumber, i) {
     const { now, cur } = todayState();
     const d = mondayOf(now);
-    d.setDate(d.getDate() + i + (viewWeek === cur ? 0 : 7));
+    d.setDate(d.getDate() + i + (weekNumber === cur ? 0 : 7));
     return d;
   }
 
-  function isTodayCell(i) {
+  function isTodayCellFor(weekNumber, i) {
     const { cur, idx } = todayState();
-    return viewWeek === cur && i === idx;
+    return weekNumber === cur && i === idx;
   }
 
-  function visibleDayIndexes() {
-    const days = weekDays();
+  function visibleDayIndexesFor(weekNumber) {
+    const days = daysOfWeek(weekNumber);
     return days.map((_, i) => i).filter((i) => i < 6 || lessonsOf(days[i]).length > 0);
   }
 
+  function dayDate(i) { return dayDateFor(viewWeek, i); }
+  function isTodayCell(i) { return isTodayCellFor(viewWeek, i); }
+  function visibleDayIndexes() { return visibleDayIndexesFor(viewWeek); }
+
+  // Полоса дней на телефоне — один сплошной скролл: сначала дни текущей недели,
+  // затем (без дополнительных нажатий) дни следующей, с лёгким разделителем между ними.
+  // На широких экранах эта полоса всё равно скрыта (см. CSS), так что здесь не нужно
+  // отдельной ветки для десктопа.
   function renderDays() {
-    const days = weekDays();
-    els.days.innerHTML = visibleDayIndexes().map((i) => {
-      const d = dayDate(i);
-      const cls = ['day-chip', lessonsOf(days[i]).length ? 'has' : '', isTodayCell(i) ? 'today' : ''].join(' ').trim();
-      return `<button type="button" class="${cls}" data-day="${i}" aria-pressed="${i === viewDay}" aria-label="${DAY_FULL[i]}, ${d.getDate()} ${MONTHS[d.getMonth()]}">
-        <span class="dow">${days[i].name}</span><span class="dnum">${d.getDate()}</span></button>`;
-    }).join('');
+    const nums = weekNumbers();
+    const { cur } = todayState();
+    const other = nums.find((n) => n !== cur);
+    const order = [cur, other].filter((n) => nums.includes(n));
+
+    let html = '';
+    order.forEach((weekNumber, orderIdx) => {
+      const days = daysOfWeek(weekNumber);
+      if (!days.length) return;
+      if (orderIdx > 0) {
+        html += `<span class="day-sep" aria-hidden="true"><span>Неделя ${weekNumber}</span></span>`;
+      }
+      html += visibleDayIndexesFor(weekNumber).map((i) => {
+        const d = dayDateFor(weekNumber, i);
+        const cls = ['day-chip', lessonsOf(days[i]).length ? 'has' : '', isTodayCellFor(weekNumber, i) ? 'today' : ''].join(' ').trim();
+        const pressed = weekNumber === viewWeek && i === viewDay;
+        return `<button type="button" class="${cls}" data-week="${weekNumber}" data-day="${i}" aria-pressed="${pressed}" aria-label="${DAY_FULL[i]}, ${d.getDate()} ${MONTHS[d.getMonth()]}">
+          <span class="dow">${days[i].name}</span><span class="dnum">${d.getDate()}</span></button>`;
+      }).join('');
+    });
+
+    els.days.innerHTML = html;
 
     const active = els.days.querySelector('[aria-pressed="true"]');
     if (active && active.scrollIntoView) active.scrollIntoView({ block: 'nearest', inline: 'center' });
@@ -488,7 +516,11 @@
   els.days.addEventListener('click', (e) => {
     const b = e.target.closest('[data-day]');
     if (!b) return;
+    const week = Number(b.dataset.week);
+    const weekChanged = week !== viewWeek;
+    viewWeek = week;
     viewDay = Number(b.dataset.day);
+    if (weekChanged) renderWeeks(weekNumbers());
     renderDays();
     renderBoard();
   });

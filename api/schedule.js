@@ -1,15 +1,14 @@
 'use strict';
 
-const { fetchHtml } = require('../lib/fetchPage');
-const { parseSchedule } = require('../lib/parse');
-const { applyFixes } = require('../lib/fixes');
+const { buildSchedule } = require('../lib/buildSchedule');
 const { refreshIntervalSeconds } = require('../lib/refreshWindow');
 
 // GET /api/schedule?page=bg203
-// Ответ кэшируется на CDN Vercel. Длительность кэша зависит от московского времени
-// (см. lib/refreshWindow.js): в учебные часы — 30 минут, в остальное время — 2 часа.
-// Сайт колледжа опрашивается не чаще, чем раз в этот промежуток, сколько бы людей
-// ни открыло приложение одновременно.
+// Ответ кэшируется на CDN Vercel: 30 минут в учебные часы, 2 часа в остальное время
+// (см. lib/refreshWindow.js) — сайт колледжа опрашивается не чаще этого, сколько бы
+// людей ни открыло страницу одновременно. Правка из админки (если есть на эту неделю)
+// попадает в тот же кэшируемый ответ, поэтому может показаться не сразу — кнопка
+// «Обновить» на странице сайта кэш обходит и подтягивает правку немедленно.
 module.exports = async (req, res) => {
   const page = String(req.query.page || 'bg203');
 
@@ -19,10 +18,7 @@ module.exports = async (req, res) => {
   }
 
   try {
-    const html = await fetchHtml(`${page}.htm`);
-    const data = applyFixes(parseSchedule(html), page);
-    data.page = page;
-    data.fetchedAt = new Date().toISOString();
+    const data = await buildSchedule(page);
 
     const maxAge = refreshIntervalSeconds();
     res.setHeader('Cache-Control', `public, s-maxage=${maxAge}, stale-while-revalidate=${maxAge * 4}`);
