@@ -1,6 +1,6 @@
 'use strict';
 
-const { requireAuth } = require('../lib/adminAuth');
+const { requireSessionApi } = require('../lib/adminAuth');
 const { currentWeekKey } = require('../lib/weekKey');
 const githubStore = require('../lib/githubStore');
 
@@ -34,7 +34,7 @@ function sanitizeDays(input) {
 // (коммитом в data/overrides.json в GitHub-репозитории). День, которого нет в "days",
 // остаётся как в основном расписании.
 module.exports = async (req, res) => {
-  if (!requireAuth(req, res)) return;
+  if (!requireSessionApi(req, res)) return;
 
   if (req.method !== 'POST') {
     res.status(405).json({ error: 'Только POST' });

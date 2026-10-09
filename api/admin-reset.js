@@ -1,13 +1,13 @@
 'use strict';
 
-const { requireAuth } = require('../lib/adminAuth');
+const { requireSessionApi } = require('../lib/adminAuth');
 const githubStore = require('../lib/githubStore');
 
 // POST /api/admin-reset  { page }
 // Убирает правки для этой группы — расписание возвращается к тому, что реально
 // на сайте колледжа (+ встроенные исправления из lib/fixes.js).
 module.exports = async (req, res) => {
-  if (!requireAuth(req, res)) return;
+  if (!requireSessionApi(req, res)) return;
 
   if (req.method !== 'POST') {
     res.status(405).json({ error: 'Только POST' });

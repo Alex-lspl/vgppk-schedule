@@ -1,6 +1,6 @@
 'use strict';
 
-const { requireAuth } = require('../lib/adminAuth');
+const { requireSessionApi } = require('../lib/adminAuth');
 const { buildSchedule } = require('../lib/buildSchedule');
 const githubStore = require('../lib/githubStore');
 
@@ -8,7 +8,7 @@ const githubStore = require('../lib/githubStore');
 // Отдаёт текущее расписание (с уже применённой правкой, если она есть и актуальна)
 // и отдельно её «сырые» дни — чтобы форма в админке знала, что уже переопределено.
 module.exports = async (req, res) => {
-  if (!requireAuth(req, res)) return;
+  if (!requireSessionApi(req, res)) return;
 
   const page = String(req.query.page || 'bg203');
   if (!/^[a-z]{1,3}\d{1,6}$/i.test(page)) {
