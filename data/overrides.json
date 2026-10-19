@@ -43,6 +43,40 @@
           "subgroup": 1,
           "note": null
         }
+      ],
+      "1": [
+        {
+          "pair": 1,
+          "subject": "Ин. язык в ПД",
+          "teacher": "Рыжкова Н.И.",
+          "room": "355",
+          "subgroup": 2,
+          "note": null
+        },
+        {
+          "pair": 2,
+          "subject": "Обеспечение безопасности веб-приложений",
+          "teacher": "Семичев Е.А.",
+          "room": "241",
+          "subgroup": null,
+          "note": null
+        },
+        {
+          "pair": 3,
+          "subject": "Прав обесп",
+          "teacher": "Изотова А.Р.",
+          "room": "109",
+          "subgroup": null,
+          "note": null
+        },
+        {
+          "pair": 4,
+          "subject": "Прав обесп",
+          "teacher": "Изотова А.Р.",
+          "room": "109",
+          "subgroup": null,
+          "note": null
+        }
       ]
     }
   }
