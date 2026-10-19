@@ -78,7 +78,16 @@
           "note": null
         }
       ],
-      "6": []
+      "6": [
+        {
+          "pair": 1,
+          "subject": "42",
+          "teacher": "42",
+          "room": "42",
+          "subgroup": null,
+          "note": "42"
+        }
+      ]
     }
   }
 }
