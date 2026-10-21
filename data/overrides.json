@@ -78,14 +78,90 @@
           "note": null
         }
       ],
-      "6": [
+      "2": [
         {
           "pair": 1,
-          "subject": "42",
-          "teacher": "42",
-          "room": "42",
+          "subject": "Прав обесп",
+          "teacher": "Изотова А.Р.",
+          "room": "109",
           "subgroup": null,
-          "note": "42"
+          "note": null
+        },
+        {
+          "pair": 2,
+          "subject": "Физ культура",
+          "teacher": "Буракова М.В.",
+          "room": "СЗ 3",
+          "subgroup": null,
+          "note": null
+        },
+        {
+          "pair": 3,
+          "subject": "Прав обесп",
+          "teacher": "Изотова А.Р.",
+          "room": "103",
+          "subgroup": null,
+          "note": null
+        },
+        {
+          "pair": 4,
+          "subject": "Основы философии",
+          "teacher": "Недорезов Н.С.",
+          "room": "341",
+          "subgroup": null,
+          "note": null
+        }
+      ],
+      "3": [
+        {
+          "pair": 1,
+          "subject": "Обеспечение безопасности веб-приложений",
+          "teacher": "Семичев Е.А.",
+          "room": "129",
+          "subgroup": null,
+          "note": null
+        },
+        {
+          "pair": 2,
+          "subject": "ГрафДизаин и Мультимедиа",
+          "teacher": "Семичева А.Г.",
+          "room": "132",
+          "subgroup": null,
+          "note": null
+        },
+        {
+          "pair": 3,
+          "subject": "Основы философии",
+          "teacher": "Недорезов Н.С.",
+          "room": "341",
+          "subgroup": null,
+          "note": null
+        }
+      ],
+      "4": [
+        {
+          "pair": 2,
+          "subject": "Прав обесп",
+          "teacher": "Изотова А.Р",
+          "room": "109",
+          "subgroup": null,
+          "note": null
+        },
+        {
+          "pair": 3,
+          "subject": "Основы философии",
+          "teacher": "Недорезов Н.С.",
+          "room": "341",
+          "subgroup": null,
+          "note": null
+        },
+        {
+          "pair": 4,
+          "subject": "Основы философии",
+          "teacher": "Недорезов Н.С.",
+          "room": "341",
+          "subgroup": null,
+          "note": null
         }
       ]
     }
