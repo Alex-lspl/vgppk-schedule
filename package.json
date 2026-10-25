@@ -1,7 +1,7 @@
 {
   "name": "vgppk-schedule",
   "version": "1.0.0",
-  "description": "Красивое расписание ВГППК",
+  "description": "Расписание ВГППК",
   "scripts": {
     "test": "node test/parse.test.js"
   },
