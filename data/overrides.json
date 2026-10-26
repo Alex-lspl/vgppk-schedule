@@ -13,17 +13,17 @@
           },
           {
             "pair": 2,
-            "subject": "Физ культура",
+            "subject": "Тест",
             "teacher": "Буракова М.В.",
             "room": "СЗ 3",
             "subgroup": null,
             "note": "Тест",
-            "changedAt": "2026-10-26T05:34:56.702Z",
+            "changedAt": "2026-10-26T06:26:33.640Z",
             "changeSource": "manual"
           }
         ]
       },
-      "updatedAt": "2026-10-26T05:34:56.702Z"
+      "updatedAt": "2026-10-26T06:26:33.640Z"
     }
   }
 }
