@@ -2,22 +2,22 @@
   'use strict';
 
   /* =========================================================
-     НАСТРОЙКИ — правь здесь
+     Настройки
      ========================================================= */
   const CONFIG = {
     // Группа по умолчанию (страница вида bg203.htm на сайте колледжа)
     defaultPage: 'bg203',
 
-    // Как часто само приложение проверяет сайт колледжа, пока страница открыта.
-    // Значения те же, что и в lib/refreshWindow.js на сервере — если меняешь
-    // одно, поменяй и другое, иначе кэш сервера и опрос приложения разъедутся.
+    // Как часто приложение проверяет сайт колледжа, пока страница открыта.
+    // Значения должны совпадать с lib/refreshWindow.js, иначе интервалы опроса
+    // и время жизни серверного кэша разойдутся.
     peakStartHourMsk: 6, // с 6:00 МСК…
     peakEndHourMsk: 17, // …до 17:00 МСК — учебные часы, проверяем чаще
     peakRefreshMs: 30 * 60 * 1000, // раз в 30 минут
     offPeakRefreshMs: 2 * 60 * 60 * 1000, // в остальное время — раз в 2 часа
 
-    // Какая из недель расписания приходится на НЕЧЁТНЫЕ недели года (по ISO-нумерации).
-    // Если приложение показывает не ту неделю — поменяй 1 на 2 (или наоборот).
+    // Номер недели расписания, которая приходится на нечётные недели года (ISO-нумерация).
+    // Значение должно совпадать с ODD_ISO_WEEK_IS в lib/weekCycle.js.
     oddIsoWeekIs: 2,
 
     // Звонки — см. TIMETABLE ниже.
@@ -127,11 +127,9 @@
   const pad = (n) => String(n).padStart(2, '0');
   const toMinutes = (hhmm) => { const [h, m] = hhmm.split(':').map(Number); return h * 60 + m; };
 
-  /* ---------- Цвет предмета: один предмет — один цвет ---------- */
-
-  /* ---------- Цвет предмета: палитра с макета ----------
-     Один предмет — один цвет. Сначала ищем по ключевым словам,
-     если ничего не подошло — стабильно подбираем из палитры по хешу. */
+  /* ---------- Цвет предмета ----------
+     Один предмет — один цвет. Сначала подбираем по ключевым словам,
+     если ничего не подошло — стабильно выбираем из палитры по хешу названия. */
 
   const SUBJECT_RULES = [
     [/граф/i, '#D97757'],                                    // графдизайн
@@ -338,6 +336,36 @@
     return `${n} пар`;
   }
 
+  /* ---------- Отметка об изменении пары ---------- */
+
+  const CHANGE_TTL_MS = 24 * 3600000;
+
+  // Отметка показывается 24 часа с момента изменения. Срок проверяется и на клиенте,
+  // потому что ответ сервера может прийти из кэша браузера или CDN.
+  function isFreshChange(l) {
+    if (!l.changedAt || (l.changeSource !== 'auto' && l.changeSource !== 'manual')) return false;
+    const age = Date.now() - Date.parse(l.changedAt);
+    return age >= 0 && age < CHANGE_TTL_MS;
+  }
+
+  function changeMarkHtml(l) {
+    if (!isFreshChange(l)) return '';
+    return `<button type="button" class="chg" data-at="${esc(l.changedAt)}" data-src="${l.changeSource}" aria-expanded="false" aria-label="Пара изменена. Показать подробности"></button>`;
+  }
+
+  // Время изменения по Москве: «Сегодня, 14:32», «Вчера, 09:05» или «25 октября, 14:32».
+  function formatChangeTime(iso) {
+    const shift = (ms) => new Date(ms + 3 * 3600000);
+    const at = shift(Date.parse(iso));
+    const now = shift(Date.now());
+    const dayNumber = (d) => Math.floor(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()) / 86400000);
+    const diff = dayNumber(now) - dayNumber(at);
+    const time = `${pad(at.getUTCHours())}:${pad(at.getUTCMinutes())}`;
+    if (diff === 0) return `Сегодня, ${time} МСК`;
+    if (diff === 1) return `Вчера, ${time} МСК`;
+    return `${at.getUTCDate()} ${MONTHS[at.getUTCMonth()]}, ${time} МСК`;
+  }
+
   function lessonHtml(l, isNow) {
     const room = l.room
       ? `<div class="room${l.room.length > 3 ? ' long' : ''}">${esc(l.room)}</div>`
@@ -348,7 +376,7 @@
         ${l.teacher ? `<p class="teacher">${esc(l.teacher)}</p>` : ''}
         ${l.subgroup && !activeSub() ? `<p class="sub-row"><span class="sub">${l.subgroup} подгруппа</span></p>` : ''}
         ${l.note ? `<p class="note">${esc(l.note)}</p>` : ''}
-      </div>${room}</li>`;
+      </div><div class="room-cell">${changeMarkHtml(l)}${room}</div></li>`;
   }
 
   function dayHtml(day, i) {
@@ -402,8 +430,59 @@
 
   function renderBoard() {
     const days = weekDays();
+    closeChangeTip();
     els.board.innerHTML = visibleDayIndexes().map((i) => dayHtml(days[i], i)).join('');
   }
+
+  /* ---------- Подсказка у отметки изменения ---------- */
+
+  const changeTip = document.createElement('div');
+  changeTip.className = 'chg-tip';
+  changeTip.setAttribute('role', 'tooltip');
+  changeTip.hidden = true;
+  document.body.appendChild(changeTip);
+  let changeTipOwner = null;
+
+  function closeChangeTip() {
+    changeTip.hidden = true;
+    if (changeTipOwner) changeTipOwner.setAttribute('aria-expanded', 'false');
+    changeTipOwner = null;
+  }
+
+  function openChangeTip(button) {
+    const auto = button.dataset.src === 'auto';
+    changeTip.innerHTML =
+      `<b>${auto ? 'Изменено автоматически' : 'Изменено вручную'}</b>` +
+      `<span>${auto ? 'Обновление на сайте колледжа' : 'Правка в админке'}</span>` +
+      `<span>${esc(formatChangeTime(button.dataset.at))}</span>`;
+    changeTip.hidden = false;
+
+    const rect = button.getBoundingClientRect();
+    const tipRect = changeTip.getBoundingClientRect();
+    const margin = 8;
+    const left = Math.min(Math.max(margin, rect.left + rect.width / 2 - tipRect.width / 2), window.innerWidth - tipRect.width - margin);
+    const below = rect.bottom + margin + tipRect.height <= window.innerHeight;
+    changeTip.style.left = `${left}px`;
+    changeTip.style.top = `${below ? rect.bottom + margin : Math.max(margin, rect.top - tipRect.height - margin)}px`;
+
+    changeTipOwner = button;
+    button.setAttribute('aria-expanded', 'true');
+  }
+
+  els.board.addEventListener('click', (e) => {
+    const button = e.target.closest('.chg');
+    if (!button) return;
+    const wasOpen = changeTipOwner === button;
+    closeChangeTip();
+    if (!wasOpen) openChangeTip(button);
+  });
+
+  document.addEventListener('click', (e) => {
+    if (changeTipOwner && !e.target.closest('.chg') && !changeTip.contains(e.target)) closeChangeTip();
+  });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeChangeTip(); });
+  window.addEventListener('scroll', closeChangeTip, { passive: true });
+  window.addEventListener('resize', closeChangeTip);
 
   // Строка статуса умещается в одну строку (при нехватке места обрезается многоточием),
   // а полное объяснение — в диалоге по нажатию (см. renderInfoDialog).
@@ -440,6 +519,7 @@
       rows.push(`<p><b>«Проверено»</b> — когда приложение в последний раз заходило на сайт колледжа и сверяло данные: сегодня в ${pad(lastCheck.getHours())}:${pad(lastCheck.getMinutes())}.</p>`);
     }
     rows.push(`<p>Приложение само проверяет сайт по расписанию — чаще в учебные часы, реже ночью. Кнопка «Обновить» рядом с номером группы проверяет сайт прямо сейчас, в обход расписания.</p>`);
+    rows.push(`<p><b>Кружок слева от аудитории</b> означает, что пару изменили за последние 24 часа. Нажмите на него, чтобы узнать, как и когда это произошло: автоматически (изменение на сайте колледжа) или вручную (правка в админке).</p>`);
     els.infoBody.innerHTML = rows.join('');
   }
 
