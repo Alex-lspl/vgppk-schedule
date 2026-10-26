@@ -13,17 +13,37 @@
           },
           {
             "pair": 2,
-            "subject": "Тест",
-            "teacher": "Буракова М.В.",
-            "room": "СЗ 3",
+            "subject": "ГрафДизаин и Мультимедиа",
+            "teacher": "Семичева А.Г.",
+            "room": "132",
             "subgroup": null,
-            "note": "Тест",
-            "changedAt": "2026-10-26T06:26:33.640Z",
+            "note": null,
+            "changedAt": "2026-10-26T14:16:06.734Z",
+            "changeSource": "manual"
+          },
+          {
+            "pair": 3,
+            "subject": "ГрафДизаин и Мультимедиа",
+            "teacher": "Семичева А.Г.",
+            "room": "132",
+            "subgroup": null,
+            "note": null,
+            "changedAt": "2026-10-26T14:16:06.734Z",
+            "changeSource": "manual"
+          },
+          {
+            "pair": 4,
+            "subject": "ГрафДизаин и Мультимедиа",
+            "teacher": "Семичева А.Г.",
+            "room": "132",
+            "subgroup": null,
+            "note": null,
+            "changedAt": "2026-10-26T14:16:06.734Z",
             "changeSource": "manual"
           }
         ]
       },
-      "updatedAt": "2026-10-26T06:26:33.640Z"
+      "updatedAt": "2026-10-26T14:16:06.734Z"
     }
   }
 }
