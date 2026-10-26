@@ -30,6 +30,7 @@
     dirty: false,
     busy: false,
     nextUid: 1,
+    index: [],
   };
 
   /* ---------- Вспомогательные функции ---------- */
@@ -168,18 +169,64 @@
     return (state.catalog && state.catalog.teachers) || [];
   }
 
-  function groupsByTeacher(teacher) {
-    var key = Autofill.normalizePerson(teacher);
-    var out = [];
-    if (!state.catalog) return out;
-    state.catalog.groups.forEach(function (g) {
-      var list = state.catalog.subjects[g.page] || [];
-      var teaches = list.some(function (s) {
-        return s.teachers.some(function (t) { return Autofill.normalizePerson(t) === key; });
+  /**
+   * Индекс для поиска: пары «предмет — преподаватель» всех групп. Одинаковые пары разных
+   * групп объединяются, чтобы под фамилией преподавателя можно было показать список групп.
+   */
+  function buildIndex() {
+    var catalog = state.catalog;
+    state.index = [];
+    if (!catalog || !catalog.subjects) return;
+
+    var names = {};
+    (catalog.groups || []).forEach(function (g) { names[g.page] = g.name; });
+
+    var merged = {};
+    Object.keys(catalog.subjects).forEach(function (page) {
+      catalog.subjects[page].forEach(function (entry) {
+        var teachers = entry.teachers.length ? entry.teachers : [''];
+        teachers.forEach(function (teacher) {
+          var key = entry.subject + '\u0000' + teacher;
+          if (!merged[key]) merged[key] = { subject: entry.subject, teacher: teacher, pages: [], names: [] };
+          merged[key].pages.push(page);
+          merged[key].names.push(names[page] || page);
+        });
       });
-      if (teaches) out.push(g);
     });
-    return out;
+
+    state.index = Object.keys(merged).map(function (key) {
+      var r = merged[key];
+      r.haystack = Autofill.normalizeText([r.subject, r.teacher, r.names.join(' ')].join(' '));
+      r.subjectKey = Autofill.normalizeText(r.subject);
+      r.teacherKey = Autofill.normalizeText(r.teacher);
+      return r;
+    });
+  }
+
+  function groupsLabel(record) {
+    var shown = record.names.slice(0, 6).join(', ');
+    var rest = record.names.length - 6;
+    return 'Группы: ' + shown + (rest > 0 ? ' и ещё ' + rest : '');
+  }
+
+  /** Поиск по предмету, фамилии преподавателя или номеру группы; записи выбранной группы идут первыми. */
+  function searchIndex(query) {
+    var tokens = Autofill.normalizeText(query).split(' ').filter(Boolean);
+    var current = state.page;
+    var found = state.index.filter(function (r) {
+      if (!tokens.length) return r.pages.indexOf(current) >= 0;
+      return tokens.every(function (t) { return r.haystack.indexOf(t) >= 0; });
+    });
+
+    function rank(r) {
+      var inGroup = r.pages.indexOf(current) >= 0 ? 0 : 2;
+      var starts = tokens.length && (r.subjectKey.indexOf(tokens[0]) === 0 || r.teacherKey.indexOf(tokens[0]) === 0) ? 0 : 1;
+      return inGroup + starts;
+    }
+    found.sort(function (a, b) { return rank(a) - rank(b) || a.subject.localeCompare(b.subject, 'ru'); });
+    return found.slice(0, SUGGESTION_LIMIT).map(function (r) {
+      return { label: r.subject, sub: r.teacher, meta: groupsLabel(r), value: r.subject, teacher: r.teacher };
+    });
   }
 
   /* ---------- Выпадающие списки с поиском ---------- */
@@ -203,25 +250,13 @@
     var kind = input.getAttribute('data-cb');
     var query = input.value;
 
-    if (kind === 'group') {
-      var groups = (state.catalog && state.catalog.groups) || [];
-      return filterOptions(groups.map(function (g) { return { label: g.name, value: g.page }; }), query);
-    }
+    if (kind === 'subject') return searchIndex(query);
 
-    if (kind === 'subject') {
-      return filterOptions(groupSubjects().map(function (s) {
-        return { label: s.subject, value: s.subject, hint: s.teachers[0] || '' };
-      }), query);
-    }
-
-    if (kind === 'teacher' || kind === 'teacherSearch') {
-      var preferred = [];
-      if (kind === 'teacher') {
-        var card = input.closest('.card');
-        var lesson = card && findLesson(card);
-        var entry = lesson && Autofill.matchSubject(lesson.subject, groupSubjects());
-        preferred = entry ? entry.teachers : [];
-      }
+    if (kind === 'teacher') {
+      var card = input.closest('.card');
+      var lesson = card && findLesson(card);
+      var entry = lesson && Autofill.matchSubject(lesson.subject, groupSubjects());
+      var preferred = entry ? entry.teachers : [];
       var rest = allTeachers().filter(function (t) { return preferred.indexOf(t) < 0; });
       var list = preferred.concat(rest).map(function (t) {
         return { label: t, value: t, hint: preferred.indexOf(t) >= 0 ? 'по предмету' : '' };
@@ -244,7 +279,9 @@
     } else {
       list.innerHTML = combo.items.map(function (o, i) {
         return '<li role="option" data-i="' + i + '"' + (i === combo.active ? ' class="active"' : '') + '>' +
-          '<span>' + esc(o.label) + '</span>' + (o.hint ? '<span class="hint">' + esc(o.hint) + '</span>' : '') + '</li>';
+          '<span class="main-line">' + esc(o.label) + (o.hint ? '<span class="hint">' + esc(o.hint) + '</span>' : '') + '</span>' +
+          (o.sub ? '<span class="sub-line">' + esc(o.sub) + '</span>' : '') +
+          (o.meta ? '<span class="meta-line">' + esc(o.meta) + '</span>' : '') + '</li>';
       }).join('');
     }
     list.hidden = false;
@@ -276,22 +313,23 @@
     var kind = input.getAttribute('data-cb');
     closeCombo();
 
-    if (kind === 'group') {
-      input.value = option.label;
-      selectGroup(option.value);
-    } else if (kind === 'teacherSearch') {
-      input.value = option.value;
-      showTeacherGroups(option.value);
-    } else {
-      input.value = option.value;
-      applyFieldValue(input, option.value, true);
-    }
+    input.value = option.value;
+    applyFieldValue(input, option.value, true);
+    if (kind === 'subject' && option.teacher) setTeacher(input.closest('.card'), option.teacher);
+  }
+
+  function setTeacher(card, teacher) {
+    var lesson = card && findLesson(card);
+    if (!lesson) return;
+    lesson.teacher = teacher;
+    lesson.teacherAuto = false;
+    card.querySelector('[data-field="teacher"]').value = teacher;
+    touch();
   }
 
   function bindCombos(root) {
     root.addEventListener('focusin', function (e) {
       if (!e.target.matches || !e.target.matches('input[data-cb]')) return;
-      if (e.target.id === 'groupInput') e.target.select();
       openCombo(e.target);
     });
 
@@ -350,48 +388,48 @@
         '<div class="bar-title"><h1>Админка расписания</h1><p class="muted" id="meta">Загрузка…</p></div>' +
         '<button type="button" class="btn" id="logoutBtn">Выйти</button>' +
       '</header>' +
-      '<section class="toolbar">' +
-        '<div class="field grow"><span class="lbl">Группа</span>' +
-          '<div class="cb"><input type="text" id="groupInput" data-cb="group" autocomplete="off" aria-label="Группа" placeholder="Начните вводить номер группы"><ul class="listbox" role="listbox" hidden></ul></div>' +
-        '</div>' +
-        '<div class="field grow"><span class="lbl">Найти преподавателя</span>' +
-          '<div class="cb"><input type="text" id="teacherSearch" data-cb="teacherSearch" autocomplete="off" aria-label="Поиск преподавателя" placeholder="Фамилия преподавателя"><ul class="listbox" role="listbox" hidden></ul></div>' +
-        '</div>' +
-        '<button type="button" class="btn" id="reloadBtn">Обновить с сайта</button>' +
-      '</section>' +
-      '<div id="teacherGroups"></div>' +
-      '<div id="banner"></div>' +
-      '<nav class="weeks" id="weeks" aria-label="Неделя"></nav>' +
-      '<nav class="days" id="dayStrip" aria-label="День недели"></nav>' +
-      '<section class="editor" id="editor"></section>' +
-      '<details class="panel desktop-only" id="autofill">' +
-        '<summary>Автозаполнение через Gemini</summary>' +
-        '<div class="panel-body">' +
-          '<ol>' +
-            '<li>Выберите, что на фотографии: вся неделя (даты видны на фото) или один день.</li>' +
-            '<li>Скопируйте промпт и отправьте его в Gemini вместе с фотографией расписания.</li>' +
-            '<li>Вставьте ответ Gemini ниже и нажмите «Применить» — расписание появится в редакторе.</li>' +
-            '<li>Проверьте результат и нажмите «Сохранить».</li>' +
-          '</ol>' +
-          '<div class="modes">' +
-            '<label><input type="radio" name="afMode" value="week" checked> Вся неделя</label>' +
-            '<label><input type="radio" name="afMode" value="day"> Один день</label>' +
-            '<select id="afDate" aria-label="Дата дня" hidden></select>' +
-          '</div>' +
-          '<div class="field"><span class="lbl">Промпт для Gemini</span><textarea id="afPrompt" readonly aria-label="Промпт для Gemini"></textarea></div>' +
-          '<div class="row"><button type="button" class="btn" id="afCopy">Скопировать промпт</button><span class="msg" id="afCopyMsg"></span></div>' +
-          '<div class="field"><span class="lbl">Ответ Gemini (JSON)</span><textarea id="afInput" aria-label="Ответ Gemini" placeholder="Вставьте сюда JSON из ответа Gemini"></textarea></div>' +
-          '<div class="row"><button type="button" class="btn primary" id="afApply">Применить к редактору</button></div>' +
-          '<div id="afReport"></div>' +
-        '</div>' +
-      '</details>' +
-      '<p class="footnote">Правки действуют на текущую и следующую недели и сбрасываются автоматически, когда неделя заканчивается.</p>' +
+      '<div class="layout">' +
+        '<main class="main">' +
+          '<section class="toolbar">' +
+            '<div class="field grow"><span class="lbl">Группа</span>' +
+              '<select id="groupSelect" aria-label="Группа"></select>' +
+            '</div>' +
+            '<button type="button" class="btn" id="reloadBtn">Обновить с сайта</button>' +
+          '</section>' +
+          '<div id="banner"></div>' +
+          '<nav class="weeks" id="weeks" aria-label="Неделя"></nav>' +
+          '<nav class="days" id="dayStrip" aria-label="День недели"></nav>' +
+          '<section class="editor" id="editor"></section>' +
+          '<p class="footnote">Правки действуют на текущую и следующую недели и сбрасываются автоматически, когда неделя заканчивается.</p>' +
+        '</main>' +
+        '<aside class="side desktop-only">' +
+          '<section class="panel" id="autofill">' +
+            '<h2>Автозаполнение через Gemini</h2>' +
+            '<ol>' +
+              '<li>Выберите, что на фотографии: вся неделя (даты видны на фото) или один день.</li>' +
+              '<li>Скопируйте промпт и отправьте его в Gemini вместе с фотографией расписания.</li>' +
+              '<li>Вставьте ответ Gemini ниже и нажмите «Применить».</li>' +
+              '<li>Проверьте результат в редакторе и нажмите «Сохранить».</li>' +
+            '</ol>' +
+            '<div class="modes">' +
+              '<label><input type="radio" name="afMode" value="week" checked> Вся неделя</label>' +
+              '<label><input type="radio" name="afMode" value="day"> Один день</label>' +
+              '<select id="afDate" aria-label="Дата дня" hidden></select>' +
+            '</div>' +
+            '<div class="field"><span class="lbl">Промпт для Gemini</span><textarea id="afPrompt" class="prompt" readonly aria-label="Промпт для Gemini"></textarea></div>' +
+            '<div class="row"><button type="button" class="btn" id="afCopy">Скопировать промпт</button><span class="msg" id="afCopyMsg"></span></div>' +
+            '<div class="field"><span class="lbl">Ответ Gemini (JSON)</span><textarea id="afInput" aria-label="Ответ Gemini" placeholder="Вставьте сюда JSON из ответа Gemini"></textarea></div>' +
+            '<div class="row"><button type="button" class="btn primary" id="afApply">Применить к редактору</button></div>' +
+            '<div id="afReport"></div>' +
+          '</section>' +
+        '</aside>' +
+      '</div>' +
       '<datalist id="roomList"></datalist>' +
       '<div class="savebar"><div class="inner">' +
         '<button type="button" class="btn primary" id="saveBtn">Сохранить</button>' +
         '<span class="msg" id="statusMsg" role="status"></span>' +
         '<span class="spacer"></span>' +
-        '<button type="button" class="btn danger small desktop-only" id="resetBtn">Сбросить все правки группы</button>' +
+        '<button type="button" class="btn danger small" id="resetBtn">Сбросить все правки группы</button>' +
       '</div></div>';
   }
 
@@ -417,7 +455,19 @@
     var text = 'Группа ' + state.groupName;
     if (state.data.updated) text += ' · на сайте колледжа обновлено ' + state.data.updated;
     qs('meta').textContent = text;
-    qs('groupInput').value = state.groupName;
+    renderGroupSelect();
+  }
+
+  function renderGroupSelect() {
+    var select = qs('groupSelect');
+    var groups = (state.catalog && state.catalog.groups) || [];
+    if (state.page && !groups.some(function (g) { return g.page === state.page; })) {
+      groups = [{ page: state.page, name: state.groupName || state.page }].concat(groups);
+    }
+    select.innerHTML = groups.map(function (g) {
+      return '<option value="' + esc(g.page) + '">' + esc(g.name) + '</option>';
+    }).join('');
+    if (state.page) select.value = state.page;
   }
 
   function renderWeeks() {
@@ -442,8 +492,7 @@
   }
 
   function markText(l) {
-    var source = l.changeSource === 'auto' ? 'автоматически' : 'вручную';
-    return 'Метка на сайте · ' + source + ', ' + formatMoment(l.changedAt);
+    return (l.changeSource === 'auto' ? 'Автоматически' : 'Вручную') + ' · ' + formatMoment(l.changedAt);
   }
 
   function cardHtml(l) {
@@ -458,8 +507,8 @@
         (mark ? '<span class="mark">' + esc(markText(mark)) + '</span>' : '<span class="spacer"></span>') +
         '<button type="button" class="icon-btn" data-action="remove" aria-label="Удалить пару" title="Удалить пару">✕</button>' +
       '</div>' +
-      '<div class="field"><span class="lbl">Предмет</span><div class="cb">' +
-        '<input type="text" data-field="subject" data-cb="subject" autocomplete="off" aria-label="Предмет" value="' + esc(l.subject) + '" placeholder="Начните вводить название">' +
+      '<div class="field"><span class="lbl">Предмет или преподаватель</span><div class="cb">' +
+        '<input type="text" data-field="subject" data-cb="subject" autocomplete="off" aria-label="Предмет или преподаватель" value="' + esc(l.subject) + '" placeholder="Введите предмет, фамилию или группу">' +
         '<ul class="listbox" role="listbox" hidden></ul></div></div>' +
       '<div class="field"><span class="lbl">Преподаватель</span><div class="cb">' +
         '<input type="text" data-field="teacher" data-cb="teacher" autocomplete="off" aria-label="Преподаватель" value="' + esc(l.teacher) + '" placeholder="Подставится по предмету">' +
@@ -656,16 +705,8 @@
 
   function selectGroup(page) {
     if (page === state.page) return;
-    if (!confirmDiscard()) { qs('groupInput').value = state.groupName; return; }
+    if (!confirmDiscard()) { qs('groupSelect').value = state.page; return; }
     loadData(page);
-  }
-
-  function showTeacherGroups(teacher) {
-    var groups = groupsByTeacher(teacher);
-    qs('teacherGroups').innerHTML = groups.length
-      ? '<p class="muted">' + esc(teacher) + ' ведёт занятия у групп:</p><div class="chips">' +
-        groups.map(function (g) { return '<button type="button" class="chip" data-group="' + esc(g.page) + '">' + esc(g.name) + '</button>'; }).join('') + '</div>'
-      : '<p class="muted">Для преподавателя ' + esc(teacher) + ' групп не найдено.</p>';
   }
 
   /* ---------- Сохранение ---------- */
@@ -862,10 +903,7 @@
       updateChrome();
     });
 
-    qs('teacherGroups').addEventListener('click', function (e) {
-      var b = e.target.closest('[data-group]');
-      if (b) selectGroup(b.getAttribute('data-group'));
-    });
+    qs('groupSelect').addEventListener('change', function (e) { selectGroup(e.target.value); });
 
     qs('reloadBtn').addEventListener('click', function () {
       if (confirmDiscard()) loadData(state.page, { keepView: true });
@@ -887,6 +925,7 @@
     return api('/api/admin-catalog').then(function (catalog) {
       state.catalog = catalog;
       state.catalogError = null;
+      buildIndex();
     }).catch(function (e) {
       state.catalogError = e.message;
       return api('/api/groups').then(function (body) {
@@ -903,6 +942,7 @@
     var catalogReady = loadCatalog();
     loadData(page).then(function () { return catalogReady; }).then(function () {
       if (!state.data) return;
+      renderGroupSelect();
       renderBanner();
       renderRooms();
       refreshAutofill();

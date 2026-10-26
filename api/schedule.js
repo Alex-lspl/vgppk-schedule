@@ -2,6 +2,7 @@
 
 const { buildSchedule } = require('../lib/buildSchedule');
 const { refreshIntervalSeconds } = require('../lib/refreshWindow');
+const { version } = require('../package.json');
 
 // GET /api/schedule?page=bg203
 // Ответ кэшируется на CDN Vercel: 30 минут в учебные часы, 2 часа в остальное время
@@ -22,7 +23,7 @@ module.exports = async (req, res) => {
     const maxAge = refreshIntervalSeconds();
     res.setHeader('Cache-Control', `public, s-maxage=${maxAge}, stale-while-revalidate=${maxAge * 4}`);
     res.setHeader('Access-Control-Allow-Origin', '*');
-    res.status(200).json(data);
+    res.status(200).json({ ...data, appVersion: version });
   } catch (e) {
     res.setHeader('Cache-Control', 'no-store');
     res.setHeader('Access-Control-Allow-Origin', '*');

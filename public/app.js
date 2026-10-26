@@ -348,9 +348,12 @@
     return age >= 0 && age < CHANGE_TTL_MS;
   }
 
+  // Тот же значок, что и у строки состояния вверху страницы.
+  const INFO_ICON = '<svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="10" cy="10" r="8.2"/><path d="M10 9.2v5" stroke-linecap="round"/><circle cx="10" cy="6.3" r="0.9" fill="currentColor" stroke="none"/></svg>';
+
   function changeMarkHtml(l) {
     if (!isFreshChange(l)) return '';
-    return `<button type="button" class="chg" data-at="${esc(l.changedAt)}" data-src="${l.changeSource}" aria-expanded="false" aria-label="Пара изменена. Показать подробности"></button>`;
+    return `<button type="button" class="chg" data-at="${esc(l.changedAt)}" data-src="${l.changeSource}" aria-expanded="false" aria-label="Пара изменена. Показать подробности">${INFO_ICON}</button>`;
   }
 
   // Время изменения по Москве: «Сегодня, 14:32», «Вчера, 09:05» или «25 октября, 14:32».
@@ -453,7 +456,6 @@
     const auto = button.dataset.src === 'auto';
     changeTip.innerHTML =
       `<b>${auto ? 'Изменено автоматически' : 'Изменено вручную'}</b>` +
-      `<span>${auto ? 'Обновление на сайте колледжа' : 'Правка в админке'}</span>` +
       `<span>${esc(formatChangeTime(button.dataset.at))}</span>`;
     changeTip.hidden = false;
 
@@ -519,7 +521,7 @@
       rows.push(`<p><b>«Проверено»</b> — когда приложение в последний раз заходило на сайт колледжа и сверяло данные: сегодня в ${pad(lastCheck.getHours())}:${pad(lastCheck.getMinutes())}.</p>`);
     }
     rows.push(`<p>Приложение само проверяет сайт по расписанию — чаще в учебные часы, реже ночью. Кнопка «Обновить» рядом с номером группы проверяет сайт прямо сейчас, в обход расписания.</p>`);
-    rows.push(`<p><b>Кружок слева от аудитории</b> означает, что пару изменили за последние 24 часа. Нажмите на него, чтобы узнать, как и когда это произошло: автоматически (изменение на сайте колледжа) или вручную (правка в админке).</p>`);
+    rows.push(`<p><b>Значок слева от аудитории</b> означает, что пару изменили за последние 24 часа. Нажмите на него, чтобы увидеть время изменения и способ: автоматически (расписание обновил колледж) или вручную.</p>`);
     els.infoBody.innerHTML = rows.join('');
   }
 
@@ -537,6 +539,17 @@
     if (!raw) return null;
     try { return JSON.parse(raw); } catch { return null; }
   }
+
+  // Версия приложения берётся из package.json развёрнутого репозитория (поле version)
+  // и приходит в ответе /api/schedule; последнее значение хранится для работы без сети.
+  function showVersion(version) {
+    const el = $('appVersion');
+    el.textContent = `v${version}`;
+    el.hidden = false;
+  }
+
+  const savedVersion = store.get('appVersion');
+  if (savedVersion) showVersion(savedVersion);
 
   async function load({ manual = false } = {}) {
     if (loading) return;
@@ -572,6 +585,10 @@
 
     data = json;
     lastCheck = new Date();
+    if (json.appVersion) {
+      store.set('appVersion', json.appVersion);
+      showVersion(json.appVersion);
+    }
     store.set(`sched:${page}`, JSON.stringify(json));
     render();
   }

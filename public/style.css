@@ -468,27 +468,16 @@ button:disabled { cursor: progress; }
   cursor: pointer;
 }
 
-.chg::after {
-  content: '';
-  position: absolute;
-  inset: 7px;
-  border-radius: 50%;
-  background: var(--accent);
-  box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 55%, transparent);
-  animation: chg-pulse 2.4s ease-out infinite;
+.chg {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent);
 }
 
-.chg:hover::after,
-.chg[aria-expanded="true"]::after { background: var(--ink); }
-
-@keyframes chg-pulse {
-  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 55%, transparent); }
-  70%, 100% { box-shadow: 0 0 0 7px transparent; }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .chg::after { animation: none; }
-}
+.chg svg { display: block; }
+.chg:hover,
+.chg[aria-expanded="true"] { color: var(--ink); }
 
 .chg-tip {
   position: fixed;
@@ -680,10 +669,19 @@ button:disabled { cursor: progress; }
 /* ---------- Подвал ---------- */
 
 .site-footer {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
   margin: 32px 0 0;
   padding-top: 16px;
   border-top: 1px solid var(--line);
   font-size: 13px;
+}
+
+.site-footer .version {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
 }
 
 .site-footer a {
