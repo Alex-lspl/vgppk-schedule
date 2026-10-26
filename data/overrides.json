@@ -1,1 +1,29 @@
-{}
+{
+  "bg203": {
+    "2026-W44": {
+      "days": {
+        "1": [
+          {
+            "pair": 1,
+            "subject": "Ин. язык в ПД",
+            "teacher": "Рыжкова Н.И.",
+            "room": "355",
+            "subgroup": 2,
+            "note": null
+          },
+          {
+            "pair": 2,
+            "subject": "Физ культура",
+            "teacher": "Буракова М.В.",
+            "room": "СЗ 3",
+            "subgroup": null,
+            "note": "Тест",
+            "changedAt": "2026-10-26T05:34:56.702Z",
+            "changeSource": "manual"
+          }
+        ]
+      },
+      "updatedAt": "2026-10-26T05:34:56.702Z"
+    }
+  }
+}
