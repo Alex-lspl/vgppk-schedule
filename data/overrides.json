@@ -41,9 +41,49 @@
             "changedAt": "2026-10-26T14:16:06.734Z",
             "changeSource": "manual"
           }
+        ],
+        "2": [
+          {
+            "pair": 1,
+            "subject": "Прав обесп",
+            "teacher": "Изотова А.Р.",
+            "room": "228",
+            "subgroup": null,
+            "note": null
+          },
+          {
+            "pair": 2,
+            "subject": "Прав обесп",
+            "teacher": "Изотова А.Р.",
+            "room": "228",
+            "subgroup": null,
+            "note": null,
+            "changedAt": "2026-10-27T19:46:37.921Z",
+            "changeSource": "manual"
+          },
+          {
+            "pair": 3,
+            "subject": "Прав обесп",
+            "teacher": "Изотова А.Р.",
+            "room": "228",
+            "subgroup": null,
+            "note": null,
+            "changedAt": "2026-10-27T19:46:37.921Z",
+            "changeSource": "manual"
+          },
+          {
+            "pair": 4,
+            "subject": "ГрафДизаин и Мультимедиа",
+            "teacher": "Семичева А.Г.",
+            "room": "132",
+            "subgroup": null,
+            "note": null,
+            "changedAt": "2026-10-27T19:46:37.921Z",
+            "changeSource": "manual"
+          }
         ]
       },
-      "updatedAt": "2026-10-26T14:16:06.734Z"
+      "updatedAt": "2026-10-27T19:46:37.921Z"
     }
   }
 }
