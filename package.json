@@ -1,9 +1,10 @@
 {
   "name": "vgppk-schedule",
-  "version": "1.0.0",
-  "description": "Красивое расписание ВГППК",
+  "version": "1.3.0",
+  "description": "Расписание ВГППК",
   "scripts": {
-    "test": "node test/parse.test.js && node test/stats.test.js"
+    "test": "node scripts/run-tests.js",
+    "admin:setup": "node scripts/setup-admin.js"
   },
   "dependencies": {
     "@upstash/redis": "^1.41.0",

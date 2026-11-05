@@ -1,7 +1,29 @@
 'use strict';
 
-const { hasValidSession } = require('../lib/adminAuth');
+const { hasValidSession, isSameOrigin } = require('../lib/adminAuth');
 const stats = require('../lib/stats');
+
+// Публичный эндпоинт, поэтому он ограничен: запросы только с того же origin и не чаще
+// LIMIT_PER_MIN с одного IP (состояние в памяти экземпляра — ограничение приблизительное,
+// но защищает дневной лимит Redis от случайного шквала и простого флуда).
+// Запас большой: в колледже десятки студентов выходят в сеть с одного публичного IP.
+const LIMIT_PER_MIN = 300;
+const MAX_TRACKED = 5000;
+const hits = new Map(); // ip → { count, resetAt }
+
+function overLimit(ip, now = Date.now()) {
+  if (hits.size >= MAX_TRACKED) {
+    for (const [k, v] of hits) if (v.resetAt <= now) hits.delete(k);
+    if (hits.size >= MAX_TRACKED) hits.clear();
+  }
+  const rec = hits.get(ip);
+  if (!rec || rec.resetAt <= now) {
+    hits.set(ip, { count: 1, resetAt: now + 60 * 1000 });
+    return false;
+  }
+  rec.count += 1;
+  return rec.count > LIMIT_PER_MIN;
+}
 
 function clientIp(req) {
   const xff = req.headers['x-forwarded-for'];
@@ -21,8 +43,9 @@ module.exports = async (req, res) => {
 
   try {
     const ua = String(req.headers['user-agent'] || '');
-    // Не считаем: статистику без подключённого хранилища, ботов и самого админа
-    if (!stats.isConfigured() || stats.isBot(ua) || hasValidSession(req)) {
+    const ip = clientIp(req);
+    // Не считаем: статистику без подключённого хранилища, чужие origin, ботов, флуд и самого админа
+    if (!stats.isConfigured() || !isSameOrigin(req) || stats.isBot(ua) || hasValidSession(req) || overLimit(ip || 'unknown')) {
       res.status(204).end();
       return;
     }
@@ -37,7 +60,6 @@ module.exports = async (req, res) => {
     }
     if (!body || typeof body !== 'object') body = {};
 
-    const ip = clientIp(req);
     const country = String(req.headers['x-vercel-ip-country'] || '').toUpperCase();
     await stats.record({
       id: stats.visitorId({ vid: body.vid, ip, ua }),

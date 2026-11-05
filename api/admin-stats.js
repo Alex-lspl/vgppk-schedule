@@ -1,31 +1,31 @@
 'use strict';
 
-const { hasValidSession } = require('../lib/adminAuth');
-const { statsPageHtml } = require('../lib/statsPage');
+const { hasValidSession, requireSessionApi } = require('../lib/adminAuth');
+const { statsPageHtml, CONTENT_SECURITY_POLICY } = require('../lib/statsPage');
 const stats = require('../lib/stats');
 
-// GET /admin/stats (переписывается в /api/admin-stats через vercel.json) — страница статистики.
-// GET /api/admin-stats?json=1 — данные для неё; ?json=1&brief=1 — только число онлайн (для значка в админке).
+// GET /admin/stats (адрес переписывается на /api/admin-stats в vercel.json) — страница статистики.
+// GET /api/admin-stats?json=1 — данные для неё; ?json=1&brief=1 — только число онлайн (для карточки в админке).
+// Без действующей сессии страница перенаправляет на вход, а JSON-запрос получает 401.
 module.exports = async (req, res) => {
-  const wantsJson = req.query && req.query.json === '1';
-
-  if (!hasValidSession(req)) {
-    if (wantsJson) {
-      res.status(401).json({ error: 'Сессия истекла, войдите заново.' });
-    } else {
-      res.setHeader('Location', '/admin');
-      res.status(302).end();
-    }
-    return;
-  }
-
-  res.setHeader('Cache-Control', 'no-store');
+  const wantsJson = !!(req.query && req.query.json === '1');
 
   if (!wantsJson) {
+    res.setHeader('Cache-Control', 'no-store');
+    res.setHeader('X-Robots-Tag', 'noindex, nofollow');
+    res.setHeader('Referrer-Policy', 'no-referrer');
+    if (!hasValidSession(req)) {
+      res.setHeader('Location', '/admin');
+      res.status(302).end();
+      return;
+    }
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.setHeader('Content-Security-Policy', CONTENT_SECURITY_POLICY);
     res.status(200).send(statsPageHtml());
     return;
   }
+
+  if (!requireSessionApi(req, res)) return;
 
   if (!stats.isConfigured()) {
     res.status(200).json({ configured: false });
@@ -40,6 +40,7 @@ module.exports = async (req, res) => {
     }
     res.status(200).json({ configured: true, ...stats.buildStats(records) });
   } catch (e) {
-    res.status(502).json({ error: e.message });
+    console.error('admin-stats failed:', e.message);
+    res.status(502).json({ error: 'Не удалось получить данные статистики.' });
   }
 };

@@ -388,6 +388,11 @@
         '<div class="bar-title"><h1>Админка расписания</h1><p class="muted" id="meta">Загрузка…</p></div>' +
         '<button type="button" class="btn" id="logoutBtn">Выйти</button>' +
       '</header>' +
+      '<a class="statsrow" href="/admin/stats">' +
+        '<span class="live-dot off" id="liveDot"></span>' +
+        '<span class="statsrow-text"><b id="onlineText">Статистика посещений</b><span id="onlineSub">Кто сейчас на сайте</span></span>' +
+        '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>' +
+      '</a>' +
       '<div class="layout">' +
         '<main class="main">' +
           '<section class="toolbar">' +
@@ -921,6 +926,29 @@
     });
   }
 
+  /* ---------- Карточка «Сейчас онлайн» ---------- */
+
+  function pollOnline() {
+    if (document.visibilityState !== 'visible') return;
+    fetch('/api/admin-stats?json=1&brief=1', { cache: 'no-store' })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (j) {
+        if (!j) return;
+        var dot = qs('liveDot'), text = qs('onlineText'), sub = qs('onlineSub');
+        if (!dot || !text || !sub) return;
+        if (!j.configured) {
+          dot.className = 'live-dot off';
+          text.textContent = 'Статистика посещений';
+          sub.textContent = 'Не подключена — см. README';
+          return;
+        }
+        dot.className = 'live-dot' + (j.online > 0 ? '' : ' off');
+        text.textContent = 'Сейчас онлайн: ' + j.online;
+        sub.textContent = 'Открыть статистику посещений';
+      })
+      .catch(function () { /* карточка — необязательная часть страницы */ });
+  }
+
   function loadCatalog() {
     return api('/api/admin-catalog').then(function (catalog) {
       state.catalog = catalog;
@@ -937,6 +965,9 @@
   function init() {
     renderShell();
     bindStatic();
+    pollOnline();
+    setInterval(pollOnline, 60000);
+    document.addEventListener('visibilitychange', pollOnline);
     setStatus('Загрузка каталога…');
     var page = store('admin:page') || DEFAULT_PAGE;
     var catalogReady = loadCatalog();
