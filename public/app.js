@@ -2,22 +2,22 @@
   'use strict';
 
   /* =========================================================
-     Настройки
+     НАСТРОЙКИ — правь здесь
      ========================================================= */
   const CONFIG = {
     // Группа по умолчанию (страница вида bg203.htm на сайте колледжа)
     defaultPage: 'bg203',
 
-    // Как часто приложение проверяет сайт колледжа, пока страница открыта.
-    // Значения должны совпадать с lib/refreshWindow.js, иначе интервалы опроса
-    // и время жизни серверного кэша разойдутся.
+    // Как часто само приложение проверяет сайт колледжа, пока страница открыта.
+    // Значения те же, что и в lib/refreshWindow.js на сервере — если меняешь
+    // одно, поменяй и другое, иначе кэш сервера и опрос приложения разъедутся.
     peakStartHourMsk: 6, // с 6:00 МСК…
     peakEndHourMsk: 17, // …до 17:00 МСК — учебные часы, проверяем чаще
     peakRefreshMs: 30 * 60 * 1000, // раз в 30 минут
     offPeakRefreshMs: 2 * 60 * 60 * 1000, // в остальное время — раз в 2 часа
 
-    // Номер недели расписания, которая приходится на нечётные недели года (ISO-нумерация).
-    // Значение должно совпадать с ODD_ISO_WEEK_IS в lib/weekCycle.js.
+    // Какая из недель расписания приходится на НЕЧЁТНЫЕ недели года (по ISO-нумерации).
+    // Если приложение показывает не ту неделю — поменяй 1 на 2 (или наоборот).
     oddIsoWeekIs: 2,
 
     // Звонки — см. TIMETABLE ниже.
@@ -127,9 +127,11 @@
   const pad = (n) => String(n).padStart(2, '0');
   const toMinutes = (hhmm) => { const [h, m] = hhmm.split(':').map(Number); return h * 60 + m; };
 
-  /* ---------- Цвет предмета ----------
-     Один предмет — один цвет. Сначала подбираем по ключевым словам,
-     если ничего не подошло — стабильно выбираем из палитры по хешу названия. */
+  /* ---------- Цвет предмета: один предмет — один цвет ---------- */
+
+  /* ---------- Цвет предмета: палитра с макета ----------
+     Один предмет — один цвет. Сначала ищем по ключевым словам,
+     если ничего не подошло — стабильно подбираем из палитры по хешу. */
 
   const SUBJECT_RULES = [
     [/граф/i, '#D97757'],                                    // графдизайн
@@ -336,39 +338,6 @@
     return `${n} пар`;
   }
 
-  /* ---------- Отметка об изменении пары ---------- */
-
-  const CHANGE_TTL_MS = 24 * 3600000;
-
-  // Отметка показывается 24 часа с момента изменения. Срок проверяется и на клиенте,
-  // потому что ответ сервера может прийти из кэша браузера или CDN.
-  function isFreshChange(l) {
-    if (!l.changedAt || (l.changeSource !== 'auto' && l.changeSource !== 'manual')) return false;
-    const age = Date.now() - Date.parse(l.changedAt);
-    return age >= 0 && age < CHANGE_TTL_MS;
-  }
-
-  // Тот же значок, что и у строки состояния вверху страницы.
-  const INFO_ICON = '<svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="10" cy="10" r="8.2"/><path d="M10 9.2v5" stroke-linecap="round"/><circle cx="10" cy="6.3" r="0.9" fill="currentColor" stroke="none"/></svg>';
-
-  function changeMarkHtml(l) {
-    if (!isFreshChange(l)) return '';
-    return `<button type="button" class="chg" data-at="${esc(l.changedAt)}" data-src="${l.changeSource}" aria-expanded="false" aria-label="Пара изменена. Показать подробности">${INFO_ICON}</button>`;
-  }
-
-  // Время изменения по Москве: «Сегодня, 14:32», «Вчера, 09:05» или «25 октября, 14:32».
-  function formatChangeTime(iso) {
-    const shift = (ms) => new Date(ms + 3 * 3600000);
-    const at = shift(Date.parse(iso));
-    const now = shift(Date.now());
-    const dayNumber = (d) => Math.floor(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()) / 86400000);
-    const diff = dayNumber(now) - dayNumber(at);
-    const time = `${pad(at.getUTCHours())}:${pad(at.getUTCMinutes())}`;
-    if (diff === 0) return `Сегодня, ${time} МСК`;
-    if (diff === 1) return `Вчера, ${time} МСК`;
-    return `${at.getUTCDate()} ${MONTHS[at.getUTCMonth()]}, ${time} МСК`;
-  }
-
   function lessonHtml(l, isNow) {
     const room = l.room
       ? `<div class="room${l.room.length > 3 ? ' long' : ''}">${esc(l.room)}</div>`
@@ -379,7 +348,7 @@
         ${l.teacher ? `<p class="teacher">${esc(l.teacher)}</p>` : ''}
         ${l.subgroup && !activeSub() ? `<p class="sub-row"><span class="sub">${l.subgroup} подгруппа</span></p>` : ''}
         ${l.note ? `<p class="note">${esc(l.note)}</p>` : ''}
-      </div><div class="room-cell">${changeMarkHtml(l)}${room}</div></li>`;
+      </div>${room}</li>`;
   }
 
   function dayHtml(day, i) {
@@ -433,58 +402,8 @@
 
   function renderBoard() {
     const days = weekDays();
-    closeChangeTip();
     els.board.innerHTML = visibleDayIndexes().map((i) => dayHtml(days[i], i)).join('');
   }
-
-  /* ---------- Подсказка у отметки изменения ---------- */
-
-  const changeTip = document.createElement('div');
-  changeTip.className = 'chg-tip';
-  changeTip.setAttribute('role', 'tooltip');
-  changeTip.hidden = true;
-  document.body.appendChild(changeTip);
-  let changeTipOwner = null;
-
-  function closeChangeTip() {
-    changeTip.hidden = true;
-    if (changeTipOwner) changeTipOwner.setAttribute('aria-expanded', 'false');
-    changeTipOwner = null;
-  }
-
-  function openChangeTip(button) {
-    const auto = button.dataset.src === 'auto';
-    changeTip.innerHTML =
-      `<b>${auto ? 'Изменено автоматически' : 'Изменено вручную'}</b>` +
-      `<span>${esc(formatChangeTime(button.dataset.at))}</span>`;
-    changeTip.hidden = false;
-
-    const rect = button.getBoundingClientRect();
-    const tipRect = changeTip.getBoundingClientRect();
-    const margin = 8;
-    const left = Math.min(Math.max(margin, rect.left + rect.width / 2 - tipRect.width / 2), window.innerWidth - tipRect.width - margin);
-    const below = rect.bottom + margin + tipRect.height <= window.innerHeight;
-    changeTip.style.left = `${left}px`;
-    changeTip.style.top = `${below ? rect.bottom + margin : Math.max(margin, rect.top - tipRect.height - margin)}px`;
-
-    changeTipOwner = button;
-    button.setAttribute('aria-expanded', 'true');
-  }
-
-  els.board.addEventListener('click', (e) => {
-    const button = e.target.closest('.chg');
-    if (!button) return;
-    const wasOpen = changeTipOwner === button;
-    closeChangeTip();
-    if (!wasOpen) openChangeTip(button);
-  });
-
-  document.addEventListener('click', (e) => {
-    if (changeTipOwner && !e.target.closest('.chg') && !changeTip.contains(e.target)) closeChangeTip();
-  });
-  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeChangeTip(); });
-  window.addEventListener('scroll', closeChangeTip, { passive: true });
-  window.addEventListener('resize', closeChangeTip);
 
   // Строка статуса умещается в одну строку (при нехватке места обрезается многоточием),
   // а полное объяснение — в диалоге по нажатию (см. renderInfoDialog).
@@ -521,7 +440,6 @@
       rows.push(`<p><b>«Проверено»</b> — когда приложение в последний раз заходило на сайт колледжа и сверяло данные: сегодня в ${pad(lastCheck.getHours())}:${pad(lastCheck.getMinutes())}.</p>`);
     }
     rows.push(`<p>Приложение само проверяет сайт по расписанию — чаще в учебные часы, реже ночью. Кнопка «Обновить» рядом с номером группы проверяет сайт прямо сейчас, в обход расписания.</p>`);
-    rows.push(`<p><b>Значок слева от аудитории</b> означает, что пару изменили за последние 24 часа. Нажмите на него, чтобы увидеть время изменения и способ: автоматически (расписание обновил колледж) или вручную.</p>`);
     els.infoBody.innerHTML = rows.join('');
   }
 
@@ -539,17 +457,6 @@
     if (!raw) return null;
     try { return JSON.parse(raw); } catch { return null; }
   }
-
-  // Версия приложения берётся из package.json развёрнутого репозитория (поле version)
-  // и приходит в ответе /api/schedule; последнее значение хранится для работы без сети.
-  function showVersion(version) {
-    const el = $('appVersion');
-    el.textContent = `v${version}`;
-    el.hidden = false;
-  }
-
-  const savedVersion = store.get('appVersion');
-  if (savedVersion) showVersion(savedVersion);
 
   async function load({ manual = false } = {}) {
     if (loading) return;
@@ -585,10 +492,6 @@
 
     data = json;
     lastCheck = new Date();
-    if (json.appVersion) {
-      store.set('appVersion', json.appVersion);
-      showVersion(json.appVersion);
-    }
     store.set(`sched:${page}`, JSON.stringify(json));
     render();
   }
@@ -691,7 +594,7 @@
     els.statusText.textContent = 'Загружаю расписание…';
     const cached = readCache();
     if (cached) { data = cached; render(); }
-    load();
+    load().finally(() => sendSignal('ping'));
   });
 
   /* ---------- Пояснение про время обновления ---------- */
@@ -705,7 +608,66 @@
 
   /* ---------- Старт: сначала кэш (мгновенно), потом свежие данные ---------- */
 
+  /* ---------- Статистика посещений ----------
+     Анонимный сигнал «я тут» для админской статистики (/admin/stats).
+     Отправляется только пока страницей реально пользуются: после 5 минут без
+     действий или при сворачивании вкладки сигналы прекращаются, а при уходе
+     уходит сигнал «ушёл» — поэтому короткие заходы тоже видны, а забытая
+     открытой вкладка не нагружает сервер. */
+
+  const HEARTBEAT_MS = 30 * 1000;
+  const IDLE_STOP_MS = 5 * 60 * 1000;
+  let lastActivity = Date.now();
+  let idle = false;
+
+  function visitorId() {
+    let id = store.get('vid');
+    if (!id || !/^[A-Za-z0-9-]{8,64}$/.test(id)) {
+      const raw = (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+      id = raw.replace(/[^A-Za-z0-9-]/g, '');
+      store.set('vid', id);
+    }
+    return id;
+  }
+
+  function sendSignal(type) {
+    try {
+      const body = JSON.stringify({ vid: visitorId(), type, group: (data && data.name) || page });
+      if (type === 'leave' && navigator.sendBeacon) {
+        navigator.sendBeacon('/api/track', new Blob([body], { type: 'text/plain;charset=UTF-8' }));
+      } else {
+        fetch('/api/track', { method: 'POST', body, headers: { 'Content-Type': 'text/plain;charset=UTF-8' }, keepalive: true }).catch(() => {});
+      }
+    } catch { /* статистика не должна ломать сайт */ }
+  }
+
+  function onActivity() {
+    lastActivity = Date.now();
+    if (idle) { idle = false; sendSignal('ping'); }
+  }
+  ['pointerdown', 'keydown', 'scroll', 'touchstart'].forEach((ev) => window.addEventListener(ev, onActivity, { passive: true }));
+
+  setInterval(() => {
+    if (document.visibilityState !== 'visible' || idle) return;
+    if (Date.now() - lastActivity > IDLE_STOP_MS) { idle = true; sendSignal('leave'); return; }
+    sendSignal('ping');
+  }, HEARTBEAT_MS);
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') {
+      sendSignal('leave');
+    } else {
+      lastActivity = Date.now();
+      idle = false;
+      sendSignal('ping');
+    }
+  });
+  window.addEventListener('pagehide', () => sendSignal('leave'));
+
+  /* ---------- Старт: сначала кэш (мгновенно), потом свежие данные ---------- */
+
   const cached = readCache();
   if (cached) { data = cached; render(); }
-  load();
+  // Сигнал «открыл страницу» уходит, когда уже известно название группы
+  load().finally(() => sendSignal('load'));
 })();
