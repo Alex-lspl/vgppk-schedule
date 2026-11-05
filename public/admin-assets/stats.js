@@ -61,7 +61,8 @@
     }
   }, true);
 
-  const countryHtml = (code) => `<span class="country">${flag(code)}<span>${esc(countryName(code))}</span>${code ? `<span class="cc">${code}</span>` : ''}</span>`;
+  // Флаг и название страны; справа — браузер посетителя (если передан), а не код страны
+  const countryHtml = (code, browser) => `<span class="country">${flag(code)}<span>${esc(countryName(code))}</span>${browser ? `<span class="cc">${esc(browser)}</span>` : ''}</span>`;
 
   function maskIp(ip) {
     if (!ip) return '—';
@@ -133,7 +134,7 @@
   function recentTable(list) {
     if (!list.length) return empty('Пока никто не заходил');
     return `<div class="table-wrap"><table class="rtable recent"><thead><tr><th>Страна</th><th>Устройство</th><th>IP-адрес</th><th>Группа</th><th>Активность</th></tr></thead><tbody>${list.map((v) => `<tr>
-      <td data-label="Страна">${countryHtml(v.country)}</td>
+      <td data-label="Страна">${countryHtml(v.country, v.browser)}</td>
       <td data-label="Устройство">${deviceHtml(v)}</td>
       <td data-label="IP-адрес">${ipHtml(v.ip)}</td>
       <td data-label="Группа">${v.groups.length ? `<span class="group-pill">${esc(v.groups[0])}</span>` : '<span class="muted">—</span>'}</td>
@@ -147,7 +148,7 @@
           <div class="person-top"><div class="person-name">${flag(v.country)}<span>Посетитель #${esc(v.short)}</span></div>${statusPill(true)}</div>
           <div class="person-row">${deviceHtml(v)}<span class="muted">${v.groups.length ? 'Группа ' + esc(v.groups[0]) : ''}</span></div>
           <div class="person-row"><span class="muted">IP-адрес</span>${ipHtml(v.ip)}</div>
-          <div class="person-row"><span class="muted">${esc(countryName(v.country))}</span><span class="muted">${firstSeen(v.first)}</span></div>
+          <div class="person-row">${countryHtml(v.country, v.browser)}<span class="muted">${firstSeen(v.first)}</span></div>
         </article>`).join('')}</div>`
       : empty('Сейчас никого нет на сайте');
     return `<section class="panel p-online"><div class="panel-head"><div><div class="panel-title">Сейчас онлайн</div><div class="panel-meta">Был сигнал за последнюю минуту</div></div>${statusPill(d.online.count > 0)}</div>${body}</section>`;
@@ -205,7 +206,7 @@
       if (state.online === 'online' && !v.online) return false;
       if (state.online === 'offline' && v.online) return false;
       if (!q) return true;
-      const hay = [v.short, v.country, countryName(v.country), v.os, ...v.ips, ...v.groups].join(' ').toLowerCase();
+      const hay = [v.short, v.country, countryName(v.country), v.browser, v.os, ...v.ips, ...v.groups].join(' ').toLowerCase();
       return hay.includes(q);
     });
   }
@@ -216,7 +217,7 @@
     return `<div class="table-wrap"><table class="rtable"><thead><tr><th>Страна</th><th>Посетитель</th><th>IP-адрес</th><th>Устройство</th><th>Группы</th><th>Первый визит</th><th>Последний визит</th><th>Статус</th></tr></thead><tbody>${list.map((v) => {
       const more = state.revealed.has(v.ip) ? v.ips.filter((x) => x !== v.ip) : [];
       return `<tr>
-        <td data-label="Страна">${countryHtml(v.country)}</td>
+        <td data-label="Страна">${countryHtml(v.country, v.browser)}</td>
         <td data-label="Посетитель">#${esc(v.short)}</td>
         <td data-label="IP-адрес"><div>${ipHtml(v.ip)}${more.length ? `<div class="ip-all">Раньше: ${esc(more.join(', '))}</div>` : ''}</div></td>
         <td data-label="Устройство">${deviceHtml(v)}</td>
@@ -232,7 +233,7 @@
       <div class="panel-head"><div><div class="panel-title">История посетителей</div><div class="panel-meta">Посетитель определяется по браузеру и IP · хранение 30 дней</div></div>
         <button class="btn small" type="button" id="exportBtn">${ICONS.download}<span>Экспорт CSV</span></button></div>
       <div class="filters">
-        <label class="search-wrap">${ICONS.search}<input class="field" id="qInput" type="search" placeholder="Поиск по IP, стране или группе" value="${esc(state.q)}"></label>
+        <label class="search-wrap">${ICONS.search}<input class="field" id="qInput" type="search" placeholder="Поиск по IP, стране, браузеру или группе" value="${esc(state.q)}"></label>
         <select class="field" id="deviceFilter" aria-label="Устройство"><option value="">Все устройства</option><option value="pc"${state.device === 'pc' ? ' selected' : ''}>Компьютер</option><option value="ios"${state.device === 'ios' ? ' selected' : ''}>iPhone / iPad</option><option value="android"${state.device === 'android' ? ' selected' : ''}>Android</option></select>
         <select class="field" id="onlineFilter" aria-label="Статус"><option value="">Все посетители</option><option value="online"${state.online === 'online' ? ' selected' : ''}>Онлайн</option><option value="offline"${state.online === 'offline' ? ' selected' : ''}>Не в сети</option></select>
       </div>
@@ -243,9 +244,9 @@
 
   function exportCsv() {
     const q = (s) => `"${String(s == null ? '' : s).replace(/"/g, '""')}"`;
-    const rows = [['Страна', 'Код', 'Посетитель', 'IP', 'Все IP', 'Устройство', 'Группы', 'Первый визит', 'Последний визит', 'Статус']];
+    const rows = [['Страна', 'Браузер', 'Посетитель', 'IP', 'Все IP', 'Устройство', 'Группы', 'Первый визит', 'Последний визит', 'Статус']];
     state.data.visitors.forEach((v) => rows.push([
-      countryName(v.country), v.country, v.short, v.ip, v.ips.join(' '), v.os, v.groups.join(' '),
+      countryName(v.country), v.browser || '', v.short, v.ip, v.ips.join(' '), v.os, v.groups.join(' '),
       `${dmy(v.first)} ${hhmm(v.first)}`, `${dmy(v.last)} ${hhmm(v.last)}`, v.online ? 'Онлайн' : 'Не в сети',
     ]));
     const csv = '\uFEFF' + rows.map((r) => r.map(q).join(';')).join('\r\n');

@@ -127,7 +127,7 @@ select.field { padding-right: 8px; }
 .country > span:nth-child(2) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .flag { width: 22px; height: 16px; border-radius: 3px; object-fit: cover; flex-shrink: 0; box-shadow: 0 0 0 1px rgba(255,255,255,.12); }
 .flag-fallback { display: inline-grid; place-items: center; width: 22px; height: 16px; border-radius: 3px; background: var(--line); color: var(--muted); font-size: 8px; font-weight: 700; flex-shrink: 0; }
-.cc { margin-left: 2px; color: var(--muted); font-size: 11px; }
+.cc { margin-left: 2px; padding: 1px 7px; border-radius: 6px; background: var(--line); color: var(--muted); font-size: 11px; white-space: nowrap; }
 
 .ip-btn { display: inline-flex; align-items: center; gap: 6px; padding: 3px 8px; border: 1px dashed var(--line); border-radius: 8px; background: none; color: #dcd4cb; font-variant-numeric: tabular-nums; font-size: 12px; }
 .ip-btn:hover { border-color: var(--accent); }

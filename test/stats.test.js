@@ -76,6 +76,44 @@ test('подсчёт посетителей, онлайна, стран и ус�
   assert.strictEqual(fake.z.get('stats:index').size, 2);
 });
 
+test('устройство: iPad под видом Mac, телефон в режиме «для ПК», планшет Android', () => {
+  const MAC = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 Version/17.0 Safari/605.1.15';
+  const LINUX = 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/120 Safari/537.36';
+  const dev = (x) => stats.parseDevice(x);
+
+  assert.deepStrictEqual(dev({ ua: UA_WIN }), { kind: 'pc', os: 'Windows / ПК' });
+  assert.deepStrictEqual(dev({ ua: UA_WIN, touch: 10, width: 1536 }), { kind: 'pc', os: 'Windows / ПК' }, 'сенсорный ноутбук остаётся ПК');
+  assert.deepStrictEqual(dev({ ua: MAC, touch: 0, width: 1440 }), { kind: 'pc', os: 'Mac / ПК' });
+  assert.deepStrictEqual(dev({ ua: MAC, touch: 5, width: 820 }), { kind: 'ios', os: 'iPad / iOS' }, 'iPadOS притворяется Mac');
+  assert.deepStrictEqual(dev({ ua: MAC, touch: 5, width: 390 }), { kind: 'ios', os: 'iPhone / iOS' }, 'iPhone в режиме для ПК');
+  assert.deepStrictEqual(dev({ ua: UA_AND }), { kind: 'android', os: 'Android' });
+  assert.deepStrictEqual(dev({ ua: UA_AND.replace(' Mobile', '') }), { kind: 'android', os: 'Android (планшет)' });
+  assert.deepStrictEqual(dev({ ua: LINUX, touch: 5, width: 412 }), { kind: 'android', os: 'Android' }, 'Android в режиме для ПК');
+  assert.deepStrictEqual(dev({ ua: LINUX, chMobile: '?1' }), { kind: 'android', os: 'Android' });
+  assert.deepStrictEqual(dev({ ua: LINUX, touch: 0, width: 1920 }), { kind: 'pc', os: 'Linux / ПК' });
+  assert.deepStrictEqual(dev({ ua: UA_WIN, chPlatform: '"Windows"', chMobile: '?0' }), { kind: 'pc', os: 'Windows / ПК' });
+});
+
+test('браузер определяется в правильном порядке', () => {
+  const b = stats.parseBrowser;
+  assert.strictEqual(b('Mozilla/5.0 (Windows NT 10.0) AppleWebKit/537.36 Chrome/120 Safari/537.36'), 'Chrome');
+  assert.strictEqual(b('Mozilla/5.0 (Windows NT 10.0) AppleWebKit/537.36 Chrome/120 Safari/537.36 Edg/120.0'), 'Edge');
+  assert.strictEqual(b('Mozilla/5.0 (Windows NT 10.0) Chrome/120 Safari/537.36 OPR/105'), 'Opera');
+  assert.strictEqual(b('Mozilla/5.0 (Windows NT 10.0) Chrome/120 YaBrowser/24.1 Safari/537.36'), 'Яндекс Браузер');
+  assert.strictEqual(b('Mozilla/5.0 (Windows NT 10.0; rv:121.0) Gecko/20100101 Firefox/121.0'), 'Firefox');
+  assert.strictEqual(b(UA_IOS), 'Safari');
+  assert.strictEqual(b('Mozilla/5.0 (iPhone; CPU iPhone OS 17_0) AppleWebKit/605 Mobile/15E148 CriOS/120 Safari/604'), 'Chrome');
+  assert.strictEqual(b('Mozilla/5.0 (Linux; Android 14) Chrome/120 Mobile Safari/537.36 SamsungBrowser/23.0'), 'Samsung Internet');
+});
+
+test('переменные Upstash находятся и с префиксом, выбранным в Vercel', () => {
+  assert.deepStrictEqual(stats.findRedisEnv({ KV_REST_API_URL: 'u', KV_REST_API_TOKEN: 't' }), { url: 'u', token: 't' });
+  assert.deepStrictEqual(stats.findRedisEnv({ UPSTASH_REDIS_REST_URL: 'u2', UPSTASH_REDIS_REST_TOKEN: 't2' }), { url: 'u2', token: 't2' });
+  assert.deepStrictEqual(stats.findRedisEnv({ STORAGE_KV_REST_API_URL: 'u3', STORAGE_KV_REST_API_TOKEN: 't3' }), { url: 'u3', token: 't3' });
+  assert.strictEqual(stats.findRedisEnv({ KV_REST_API_URL: 'u' }), null);
+  assert.strictEqual(stats.findRedisEnv({}), null);
+});
+
 /* ---------- Эндпоинты и защита ---------- */
 
 const auth = require('../lib/adminAuth');
@@ -127,10 +165,10 @@ test('admin-stats: страница с сессией отдаётся со ст
   assert(res.body.includes('/admin-assets/stats.js'));
 }));
 
-test('track: админ, чужой origin и боты не учитываются, обычный заход — да', withAdminEnv(async () => {
+test('visit: админ, чужой origin и боты не учитываются, обычный заход — да', withAdminEnv(async () => {
   const fake = makeFakeRedis();
   stats.setClientForTests(fake);
-  const track = require('../api/track');
+  const track = require('../api/visit');
   const body = JSON.stringify({ vid: 'dddddddd-4444', type: 'load', group: '841' });
   const base = { method: 'POST', body, headers: { 'user-agent': UA_WIN, host: 'site.test', 'x-forwarded-for': '95.1.2.3' } };
 
@@ -146,4 +184,5 @@ test('track: админ, чужой origin и боты не учитываютс
   const rec = JSON.parse(fake.kv.get('stats:v:dddddddd-4444'));
   assert.strictEqual(rec.country, 'RU');
   assert.strictEqual(rec.ip, '95.1.2.3');
+  assert.strictEqual(rec.browser, 'Chrome');
 }));

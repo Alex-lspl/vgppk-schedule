@@ -727,11 +727,18 @@
 
   function sendSignal(type) {
     try {
-      const body = JSON.stringify({ vid: visitorId(), type, group: (data && data.name) || page });
+      const body = JSON.stringify({
+        vid: visitorId(),
+        type,
+        group: (data && data.name) || page,
+        // Помогают отличить телефон/планшет от компьютера, когда User-Agent их выдаёт за ПК
+        touch: navigator.maxTouchPoints || 0,
+        w: Math.min(screen.width || 0, screen.height || 0),
+      });
       if (type === 'leave' && navigator.sendBeacon) {
-        navigator.sendBeacon('/api/track', new Blob([body], { type: 'text/plain;charset=UTF-8' }));
+        navigator.sendBeacon('/api/visit', new Blob([body], { type: 'text/plain;charset=UTF-8' }));
       } else {
-        fetch('/api/track', { method: 'POST', body, headers: { 'Content-Type': 'text/plain;charset=UTF-8' }, keepalive: true }).catch(() => {});
+        fetch('/api/visit', { method: 'POST', body, headers: { 'Content-Type': 'text/plain;charset=UTF-8' }, keepalive: true }).catch(() => {});
       }
     } catch { /* статистика не должна ломать сайт */ }
   }
