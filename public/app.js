@@ -6,7 +6,6 @@
      ========================================================= */
   const CONFIG = {
     // Группа по умолчанию (страница вида bg203.htm на сайте колледжа)
-    defaultPage: 'bg203',
 
     // Как часто приложение проверяет сайт колледжа, пока страница открыта.
     // Значения должны совпадать с lib/refreshWindow.js, иначе интервалы опроса
@@ -78,10 +77,18 @@
     subgroups: $('subgroups'),
     days: $('days'),
     board: $('board'),
-    picker: $('picker'),
-    pickerSearch: $('pickerSearch'),
-    pickerList: $('pickerList'),
-    pickerClose: $('pickerClose'),
+    homeView: $('homeView'),
+    scheduleView: $('scheduleView'),
+    homeBack: $('homeBack'),
+    homeBackName: $('homeBackName'),
+    homeSearch: $('homeSearch'),
+    homeClear: $('homeClear'),
+    homeCount: $('homeCount'),
+    tiles: $('tiles'),
+    homeEmpty: $('homeEmpty'),
+    tgLink: $('tgLink'),
+    tgCopy: $('tgCopy'),
+    tgNote: $('tgNote'),
     infoDialog: $('infoDialog'),
     infoBody: $('infoBody'),
     infoClose: $('infoClose'),
@@ -96,7 +103,10 @@
     { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
   ));
 
-  let page = new URLSearchParams(location.search).get('page') || store.get('page') || CONFIG.defaultPage;
+  // Группа: из адреса (?page=…) или запомненная на этом устройстве. Если её нет — человек
+  // впервые на сайте, и вместо расписания показывается главная с выбором группы.
+  let page = new URLSearchParams(location.search).get('page') || store.get('page') || '';
+  let view = 'schedule'; // 'home' | 'schedule'
   let data = null;
   let mySub = Number(store.get('sub')) || null; // null = показывать всех
   let viewWeek = null;
@@ -552,7 +562,7 @@
   if (savedVersion) showVersion(savedVersion);
 
   async function load({ manual = false } = {}) {
-    if (loading) return;
+    if (loading || !page || view !== 'schedule') return;
     loading = true;
     els.refreshBtn.classList.add('loading');
     els.refreshBtn.disabled = true;
@@ -643,55 +653,164 @@
     }
   });
 
-  /* ---------- Выбор группы ---------- */
+  /* ---------- Главная: выбор группы ---------- */
 
-  let groups = null;
+  const GROUPS_KEY = 'groups';
+  const byName = (x, y) => x.name.localeCompare(y.name, 'ru', { numeric: true });
 
-  function renderGroups() {
-    const q = els.pickerSearch.value.trim().toLowerCase();
-    const list = (groups || []).filter((g) => g.name.toLowerCase().includes(q));
-    els.pickerList.innerHTML = list.length
-      ? list.map((g) => `<li><button type="button" data-page="${esc(g.page)}"${g.page === page ? ' aria-current="true"' : ''}>${esc(g.name)}</button></li>`).join('')
-      : '<li class="msg">Ничего не найдено</li>';
+  function readGroupsCache() {
+    try {
+      const list = JSON.parse(store.get(GROUPS_KEY));
+      return Array.isArray(list) ? list : null;
+    } catch { return null; }
   }
 
-  async function openPicker() {
-    els.picker.showModal();
-    els.pickerSearch.value = '';
-    els.pickerSearch.focus();
-    if (groups) { renderGroups(); return; }
-    els.pickerList.innerHTML = '<li class="msg">Загружаю список групп…</li>';
+  let groups = readGroupsCache(); // показываем сохранённый список сразу, свежий подтягиваем фоном
+  let groupsState = groups ? 'ready' : 'loading'; // loading | ready | error
+
+  function filteredGroups() {
+    const q = els.homeSearch.value.trim().toLowerCase();
+    return (groups || []).filter((g) => g.name.toLowerCase().includes(q));
+  }
+
+  function renderTiles() {
+    const q = els.homeSearch.value.trim();
+    els.homeClear.hidden = !q;
+    const list = filteredGroups();
+    els.homeCount.textContent = groups ? list.length : '…';
+    els.tiles.innerHTML = list.map((g) => (
+      `<button class="tile" type="button" data-page="${esc(g.page)}"${g.page === page ? ' aria-current="true"' : ''}>${esc(g.name)}</button>`
+    )).join('');
+
+    let msg = '';
+    if (!groups && groupsState === 'error') {
+      msg = 'Не удалось загрузить список групп. Проверьте соединение.<br><button type="button" data-retry>Повторить</button>';
+    } else if (!groups) {
+      msg = 'Загружаю список групп…';
+    } else if (!list.length) {
+      msg = 'Группы с таким номером не найдены.';
+    }
+    els.homeEmpty.innerHTML = msg;
+    els.homeEmpty.hidden = !msg;
+  }
+
+  async function loadGroups() {
+    groupsState = groups ? 'ready' : 'loading';
+    renderTiles();
     try {
       const res = await fetch('/api/groups');
       const json = await res.json();
-      if (!res.ok) throw new Error(json.error);
-      groups = json.groups;
-      renderGroups();
+      if (!res.ok || !Array.isArray(json.groups)) throw new Error(json.error || 'bad response');
+      groups = json.groups.slice().sort(byName);
+      store.set(GROUPS_KEY, JSON.stringify(groups));
+      groupsState = 'ready';
     } catch {
-      els.pickerList.innerHTML = '<li class="msg">Не удалось загрузить список групп. Проверь соединение и попробуй ещё раз.</li>';
+      if (!groups) groupsState = 'error'; // есть сохранённый список — молча пользуемся им
     }
+    renderTiles();
   }
 
-  els.groupBtn.addEventListener('click', openPicker);
-  els.pickerClose.addEventListener('click', () => els.picker.close());
-  els.pickerSearch.addEventListener('input', renderGroups);
-  els.picker.addEventListener('click', (e) => { if (e.target === els.picker) els.picker.close(); });
+  function showView(name) {
+    view = name;
+    els.homeView.hidden = name !== 'home';
+    els.scheduleView.hidden = name !== 'schedule';
+    window.scrollTo(0, 0);
+  }
 
-  els.pickerList.addEventListener('click', (e) => {
-    const b = e.target.closest('[data-page]');
-    if (!b) return;
-    page = b.dataset.page;
-    store.set('page', page);
-    history.replaceState(null, '', location.pathname);
-    els.picker.close();
-    data = null;
-    viewWeek = null;
-    els.board.innerHTML = '';
-    els.days.innerHTML = '';
-    els.statusText.textContent = 'Загружаю расписание…';
-    const cached = readCache();
-    if (cached) { data = cached; render(); }
+  // Главная открывается как отдельный «экран» истории: кнопка «Назад» на телефоне
+  // возвращает к расписанию, а не уводит с сайта.
+  function openHome() {
+    if (view === 'home') return;
+    if (page) history.pushState({ home: true }, '', location.pathname);
+    els.homeSearch.value = '';
+    els.homeBack.hidden = !page;
+    els.homeBackName.textContent = (data && data.name) || '';
+    showView('home');
+    loadGroups();
+    // На телефоне сразу выезжающая клавиатура мешает выбрать из списка — фокус только на компьютере
+    if (!matchMedia('(pointer: coarse)').matches) els.homeSearch.focus();
+  }
+
+  function openSchedule() {
+    showView('schedule');
+    if (!data) { const c = readCache(); if (c) { data = c; render(); } }
     load();
+  }
+
+  function chooseGroup(p) {
+    if (p !== page) {
+      page = p;
+      data = null;
+      viewWeek = null;
+      els.board.innerHTML = '';
+      els.days.innerHTML = '';
+      els.statusText.textContent = 'Загружаю расписание…';
+    }
+    store.set('page', page); // запоминаем выбор на этом устройстве
+    if (location.search) history.replaceState(history.state, '', location.pathname);
+    if (history.state && history.state.home) {
+      history.back(); // popstate вернёт на экран расписания и загрузит его
+    } else {
+      openSchedule();
+    }
+    sendSignal('ping'); // сообщить статистике новую группу (имя придёт после загрузки)
+  }
+
+  els.groupBtn.addEventListener('click', openHome);
+  els.homeBack.addEventListener('click', () => { if (history.state && history.state.home) history.back(); else openSchedule(); });
+  els.homeSearch.addEventListener('input', renderTiles);
+  els.homeSearch.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter') return;
+    const first = filteredGroups()[0];
+    if (first && els.homeSearch.value.trim()) chooseGroup(first.page);
+  });
+  els.homeClear.addEventListener('click', () => { els.homeSearch.value = ''; els.homeSearch.focus(); renderTiles(); });
+  els.tiles.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-page]');
+    if (b) chooseGroup(b.dataset.page);
+  });
+  els.homeEmpty.addEventListener('click', (e) => { if (e.target.closest('[data-retry]')) loadGroups(); });
+
+  window.addEventListener('popstate', () => {
+    if (history.state && history.state.home) {
+      els.homeBack.hidden = !page;
+      els.homeBackName.textContent = (data && data.name) || '';
+      showView('home');
+      renderTiles();
+      loadGroups();
+    } else if (page) {
+      openSchedule();
+    }
+  });
+
+  /* ---------- Подвал: Telegram ---------- */
+
+  // Ссылка https://t.me открывает приложение, если оно есть, а если нет — веб-версию в браузере.
+  // Если не открылось совсем (нет Telegram, блокировка), рядом есть кнопка «скопировать».
+  async function copyText(text) {
+    try {
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch { /* нет доступа к буферу — пробуем старый способ */ }
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.setAttribute('readonly', '');
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    let ok = false;
+    try { ok = document.execCommand('copy'); } catch { ok = false; }
+    ta.remove();
+    return ok;
+  }
+
+  let tgNoteTimer = null;
+  els.tgCopy.addEventListener('click', async () => {
+    const ok = await copyText('@l_SP_Soft_l');
+    els.tgNote.textContent = ok ? 'Скопировано' : 'Не удалось скопировать — введите @l_SP_Soft_l вручную';
+    clearTimeout(tgNoteTimer);
+    tgNoteTimer = setTimeout(() => { els.tgNote.textContent = ''; }, 2500);
   });
 
   /* ---------- Пояснение про время обновления ---------- */
@@ -766,13 +885,26 @@
   });
   window.addEventListener('pagehide', () => sendSignal('leave'));
 
-  /* ---------- Старт: сначала кэш (мгновенно), потом свежие данные ---------- */
+  /* ---------- Старт ----------
+     Группа уже выбрана на этом устройстве — сразу расписание: сначала из кэша (мгновенно),
+     потом свежие данные. Не выбрана — главная со списком групп. */
 
-  const cached = readCache();
-  if (cached) { data = cached; render(); }
   // Сигнал «открыл страницу» уходит сразу, не дожидаясь загрузки расписания: на телефоне она
   // может идти долго, а свёрнутую вкладку браузер замораживает, и сигнал бы потерялся.
   // Название группы уйдёт со следующим сигналом, когда расписание загрузится.
   sendSignal('load');
-  load().finally(() => sendSignal('ping'));
+
+  // После перезагрузки браузер помнит служебное состояние истории «экран выбора» — сбрасываем его
+  if (history.state && history.state.home) history.replaceState(null, '', location.pathname);
+
+  if (page) {
+    showView('schedule');
+    const cached = readCache();
+    if (cached) { data = cached; render(); }
+    load().finally(() => sendSignal('ping'));
+  } else {
+    showView('home');
+    renderTiles();
+    loadGroups();
+  }
 })();

@@ -551,9 +551,8 @@ button:disabled { cursor: progress; }
   color: var(--muted);
 }
 
-/* ---------- Выбор группы ---------- */
+/* ---------- Диалог «Как это работает» ---------- */
 
-.picker,
 .info {
   width: min(440px, calc(100vw - 24px));
   max-height: min(620px, 82vh);
@@ -565,10 +564,8 @@ button:disabled { cursor: progress; }
   overflow: hidden;
 }
 
-.picker[open],
 .info[open] { display: flex; flex-direction: column; }
 
-.picker::backdrop,
 .info::backdrop { background: rgb(0 0 0 / 0.6); }
 
 .picker-head {
@@ -581,20 +578,6 @@ button:disabled { cursor: progress; }
 
 .picker-head strong { flex: 1; font-size: 15px; }
 
-.picker-head input {
-  flex: 1;
-  min-width: 0;
-  padding: 10px 14px;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  background: var(--bg);
-  color: var(--ink);
-}
-
-.picker-head input::placeholder { color: var(--muted); }
-
-.picker-head input:focus { border-color: var(--accent); outline: none; }
-
 .picker-close {
   padding: 0 12px;
   border: 0;
@@ -603,26 +586,6 @@ button:disabled { cursor: progress; }
 }
 
 .picker-close:hover { color: var(--ink); }
-
-.picker-list {
-  margin: 0;
-  padding: 6px;
-  overflow-y: auto;
-  list-style: none;
-}
-
-.picker-list button {
-  width: 100%;
-  padding: 12px 14px;
-  border: 0;
-  border-radius: 10px;
-  background: none;
-  text-align: left;
-}
-
-.picker-list button:hover { background: var(--surface-2); }
-.picker-list button[aria-current="true"] { font-weight: 600; color: var(--accent); }
-.picker-list .msg { padding: 16px; color: var(--muted); }
 
 /* ---------- Широкие экраны: все дни сразу ---------- */
 
@@ -670,7 +633,7 @@ button:disabled { cursor: progress; }
 
 .site-footer {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
   gap: 12px;
   margin: 32px 0 0;
@@ -690,3 +653,184 @@ button:disabled { cursor: progress; }
 }
 
 .site-footer a:hover { color: var(--accent); }
+
+.site-footer .tg { display: inline-flex; align-items: center; gap: 4px; flex-wrap: wrap; min-width: 0; }
+
+.tg-copy {
+  display: inline-grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--muted);
+}
+
+.tg-copy:hover { color: var(--accent); background: var(--surface); }
+
+.tg-note { font-size: 12px; color: var(--accent); }
+.tg-note:empty { display: none; }
+
+/* ---------- Главная: выбор группы ---------- */
+
+[hidden] { display: none !important; }
+
+.home-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 40px;
+}
+
+.home-logo {
+  width: 50px;
+  height: 50px;
+  border-radius: 13px;
+  flex-shrink: 0;
+}
+
+.home-brand { font: 700 15px/1.2 var(--font-display); letter-spacing: -0.01em; }
+.home-sub { margin-top: 5px; font-size: 12px; color: var(--muted); }
+
+.home-main { max-width: 850px; margin: 0 auto; }
+
+.home-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 18px;
+  padding: 9px 13px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.home-back:hover { color: var(--ink); border-color: var(--accent); }
+.home-back b { color: var(--accent); font-weight: 600; }
+
+.home-intro { text-align: center; margin-bottom: 26px; }
+
+.home-intro h1 {
+  margin: 0 0 10px;
+  font: 700 clamp(22px, 6vw, 30px)/1.15 var(--font-display);
+  letter-spacing: -0.02em;
+}
+
+.home-intro p { margin: 0; font-size: 14px; line-height: 1.5; color: var(--muted); }
+
+.home-search {
+  max-width: 590px;
+  height: 52px;
+  margin: 0 auto 24px;
+  padding: 0 8px 0 15px;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--muted);
+}
+
+.home-search:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(217, 119, 87, 0.12); }
+
+.home-search svg { flex-shrink: 0; }
+
+.home-search input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--ink);
+  font-size: 16px; /* 16px — иначе iPhone приближает страницу при фокусе */
+}
+
+.home-search input::placeholder { color: var(--muted); opacity: 0.75; }
+.home-search input::-webkit-search-cancel-button { display: none; }
+
+.home-clear {
+  width: 36px;
+  height: 36px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--muted);
+  font-size: 22px;
+  line-height: 1;
+}
+
+.home-clear:hover { color: var(--ink); }
+
+.home-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 13px;
+}
+
+.home-meta-title { font-size: 14px; font-weight: 600; }
+.home-count { font-size: 12px; color: var(--muted); }
+.home-count strong { color: var(--accent); font-weight: 600; }
+
+.tiles {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.tile {
+  min-height: 66px;
+  padding: 8px 6px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--ink);
+  font: 700 20px/1.1 var(--font-body);
+  letter-spacing: 0.3px;
+  overflow-wrap: anywhere;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+}
+
+.tile:hover { background: var(--surface-2); border-color: var(--accent); transform: translateY(-1px); }
+.tile[aria-current="true"] { border-color: var(--accent); color: var(--accent); }
+
+.home-empty {
+  padding: 34px 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  text-align: center;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+.home-empty button {
+  margin-top: 12px;
+  padding: 9px 16px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface-2);
+}
+
+.home-empty button:hover { border-color: var(--accent); }
+
+@media (max-width: 900px) { .tiles { grid-template-columns: repeat(5, minmax(0, 1fr)); } }
+
+@media (max-width: 650px) {
+  .home-head { margin-bottom: 32px; }
+  .tiles { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+  .tile { min-height: 56px; font-size: 18px; }
+  .home-search { height: 49px; }
+}
+
+@media (max-width: 360px) {
+  .tiles { gap: 7px; }
+  .tile { min-height: 52px; font-size: 17px; }
+}

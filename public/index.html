@@ -21,6 +21,44 @@
 </head>
 <body>
   <div class="app">
+    <!-- Главная: выбор группы. Показывается при первом заходе и по кнопке «сменить» -->
+    <div id="homeView" hidden>
+      <header class="home-head">
+        <img class="home-logo" src="/icon-128.png" alt="" width="50" height="50">
+        <div>
+          <div class="home-brand">Расписание занятий</div>
+          <div class="home-sub">ГБПОУ ВО «ВГППК»</div>
+        </div>
+      </header>
+
+      <section class="home-main">
+        <button class="home-back" id="homeBack" type="button" hidden>
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>
+          <span>К расписанию <b id="homeBackName"></b></span>
+        </button>
+
+        <div class="home-intro">
+          <h1>Выберите свою группу</h1>
+          <p>Найдите группу, чтобы посмотреть расписание занятий.<br>Выбор запомнится на этом устройстве.</p>
+        </div>
+
+        <label class="home-search">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+          <input id="homeSearch" type="search" inputmode="search" autocomplete="off" enterkeyhint="go" placeholder="Введите номер группы…" aria-label="Поиск группы">
+          <button class="home-clear" id="homeClear" type="button" aria-label="Очистить поиск" hidden>×</button>
+        </label>
+
+        <div class="home-meta">
+          <span class="home-meta-title">Все группы</span>
+          <span class="home-count">Доступно групп: <strong id="homeCount">…</strong></span>
+        </div>
+
+        <div class="tiles" id="tiles"></div>
+        <div class="home-empty" id="homeEmpty" role="status" hidden></div>
+      </section>
+    </div>
+
+    <div id="scheduleView" hidden>
     <header class="top">
       <button class="group" id="groupBtn" type="button" aria-haspopup="dialog">
         <span class="group-num" id="groupName">…</span>
@@ -45,19 +83,21 @@
 
     <main class="board" id="board"></main>
 
+    </div>
+
     <footer class="site-footer">
-      <a href="tg://resolve?domain=l_SP_Soft_l">Telegram: @l_SP_Soft_l</a>
+      <span class="tg">
+        <!-- https://t.me открывается и в приложении, и в браузере (веб-версия), в отличие от tg://,
+             которое без установленного Telegram не делает ничего -->
+        <a id="tgLink" href="https://t.me/l_SP_Soft_l" target="_blank" rel="noopener noreferrer">Telegram: @l_SP_Soft_l</a>
+        <button class="tg-copy" id="tgCopy" type="button" aria-label="Скопировать @l_SP_Soft_l" title="Скопировать имя в Telegram">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/></svg>
+        </button>
+        <span class="tg-note" id="tgNote" role="status" aria-live="polite"></span>
+      </span>
       <span class="version" id="appVersion" hidden></span>
     </footer>
   </div>
-
-  <dialog class="picker" id="picker" aria-label="Выбор группы">
-    <div class="picker-head">
-      <input id="pickerSearch" type="search" placeholder="Найти группу" autocomplete="off">
-      <button id="pickerClose" type="button" class="picker-close">Закрыть</button>
-    </div>
-    <ul class="picker-list" id="pickerList"></ul>
-  </dialog>
 
   <dialog class="info" id="infoDialog" aria-label="Как обновляются данные">
     <div class="picker-head">
