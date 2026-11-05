@@ -730,7 +730,7 @@
       const body = JSON.stringify({
         vid: visitorId(),
         type,
-        group: (data && data.name) || page,
+        group: (data && data.name) || '',
         // Помогают отличить телефон/планшет от компьютера, когда User-Agent их выдаёт за ПК
         touch: navigator.maxTouchPoints || 0,
         w: Math.min(screen.width || 0, screen.height || 0),
@@ -770,6 +770,9 @@
 
   const cached = readCache();
   if (cached) { data = cached; render(); }
-  // Сигнал «открыл страницу» уходит, когда уже известно название группы
-  load().finally(() => sendSignal('load'));
+  // Сигнал «открыл страницу» уходит сразу, не дожидаясь загрузки расписания: на телефоне она
+  // может идти долго, а свёрнутую вкладку браузер замораживает, и сигнал бы потерялся.
+  // Название группы уйдёт со следующим сигналом, когда расписание загрузится.
+  sendSignal('load');
+  load().finally(() => sendSignal('ping'));
 })();

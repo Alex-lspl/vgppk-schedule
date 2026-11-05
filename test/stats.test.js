@@ -14,6 +14,7 @@ test('определение устройства, ботов и очистка 
   assert.strictEqual(stats.parseUA(UA_IOS).kind, 'ios');
   assert.strictEqual(stats.parseUA(UA_WIN).kind, 'pc');
   assert(stats.isBot('Googlebot/2.1'));
+  assert(!stats.isBot('Mozilla/5.0 (Linux; Android 10; CUBOT_X30) AppleWebKit/537.36 Chrome/120 Mobile Safari/537.36'), 'CUBOT — это телефон');
   assert(stats.isBot(''));
   assert(!stats.isBot(UA_WIN));
   assert(!stats.isBot(UA_IOS));
@@ -185,4 +186,26 @@ test('visit: админ, чужой origin и боты не учитываютс
   assert.strictEqual(rec.country, 'RU');
   assert.strictEqual(rec.ip, '95.1.2.3');
   assert.strictEqual(rec.browser, 'Chrome');
+}));
+
+test('отклонённые сигналы попадают в диагностику', withAdminEnv(async () => {
+  const fake = makeFakeRedis();
+  stats.setClientForTests(fake);
+  const visit = require('../api/visit');
+  const headers = { 'user-agent': 'Googlebot/2.1', host: 'site.test', 'x-forwarded-for': '66.1.1.1' };
+  await visit({ method: 'POST', body: '{}', headers }, mockRes());
+  await visit({ method: 'POST', body: '{}', headers: { ...headers, 'user-agent': UA_WIN, origin: 'https://evil.test' } }, mockRes());
+  const skips = await stats.loadSkips();
+  assert.deepStrictEqual(skips.map((x) => `${x.reason}:${x.count}`).sort(), ['bot:1', 'origin:1']);
+  assert(skips.find((x) => x.reason === 'origin').sample.includes('evil.test'));
+}));
+
+test('старый адрес /api/track по-прежнему принимает сигналы', withAdminEnv(async () => {
+  const fake = makeFakeRedis();
+  stats.setClientForTests(fake);
+  const track = require('../api/track');
+  const res = mockRes();
+  await track({ method: 'POST', body: JSON.stringify({ vid: 'eeeeeeee-5555', type: 'load' }), headers: { 'user-agent': UA_AND, host: 'site.test', 'x-forwarded-for': '1.2.3.4' } }, res);
+  assert.strictEqual(res.code, 204);
+  assert.strictEqual(fake.kv.size, 1);
 }));

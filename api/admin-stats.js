@@ -38,7 +38,8 @@ module.exports = async (req, res) => {
       res.status(200).json({ configured: true, online: stats.countOnline(records) });
       return;
     }
-    res.status(200).json({ configured: true, ...stats.buildStats(records) });
+    const skips = await stats.loadSkips().catch(() => []);
+    res.status(200).json({ configured: true, ...stats.buildStats(records), skips });
   } catch (e) {
     console.error('admin-stats failed:', e.message);
     res.status(502).json({ error: 'Не удалось получить данные статистики.' });

@@ -49,13 +49,18 @@ module.exports = async (req, res) => {
     // Не считаем: статистику без подключённого хранилища, чужие origin, ботов, флуд и самого админа.
     // Причина пропуска видна в заголовке X-Visit-Skip ответа (DevTools → Network).
     const skip = !stats.isConfigured() ? 'no-storage'
+      : overLimit(ip || 'unknown') ? 'limit'
       : !isSameOrigin(req) ? 'origin'
       : stats.isBot(ua) ? 'bot'
       : hasValidSession(req) ? 'admin'
-      : overLimit(ip || 'unknown') ? 'limit'
       : null;
     if (skip) {
       res.setHeader('X-Visit-Skip', skip);
+      // Причины, которые стоит видеть в статистике (флуд и отсутствие базы не пишем)
+      if (skip === 'origin' || skip === 'bot' || skip === 'admin') {
+        const sample = skip === 'origin' ? `origin=${req.headers.origin || '-'} host=${req.headers.host || '-'} | ${ua}` : ua;
+        await stats.noteSkip(skip, sample).catch(() => {});
+      }
       res.status(204).end();
       return;
     }

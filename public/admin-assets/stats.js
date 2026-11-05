@@ -161,6 +161,19 @@
     return `<div class="geo-list">${rows.map((r) => `<div class="geo-row">${countryHtml(r.code)}<div class="geo-track"><div class="geo-fill" data-w="${Math.max(4, Math.round((r.count / max) * 100))}"></div></div><div class="geo-count">${fmt(r.count)}</div></div>`).join('')}</div>`;
   }
 
+  const SKIP_LABELS = {
+    bot: 'Принят за бота (по User-Agent)',
+    origin: 'Запрос с чужого адреса (Origin)',
+    admin: 'Вы были залогинены в админке',
+  };
+
+  function skipsPanel(d) {
+    const list = d.skips || [];
+    if (!list.length) return '';
+    return `<section class="panel"><div class="panel-head"><div><div class="panel-title">Не засчитано</div><div class="panel-meta">Сигналы, которые сервер отклонил, за 30 дней. Нужно, чтобы понять, почему кого-то не видно.</div></div></div>
+      <div class="skip-list">${list.map((x) => `<div class="skip-row"><div class="skip-top"><span>${esc(SKIP_LABELS[x.reason] || x.reason)}</span><b>${fmt(x.count)}</b></div>${x.sample ? `<div class="skip-sample">Последний: ${esc(x.sample)}</div>` : ''}</div>`).join('')}</div></section>`;
+  }
+
   function viewOverview(d) {
     const per = d.periods[state.period];
     return `
@@ -193,6 +206,7 @@
             <div class="panel-head"><div><div class="panel-title">Топ стран</div><div class="panel-meta">За последние 30 дней</div></div><button class="btn small" type="button" data-goto="geo">Подробнее</button></div>
             ${geoRows(d.countries, 5)}
           </section>
+          ${skipsPanel(d)}
         </aside>
       </div>`;
   }
