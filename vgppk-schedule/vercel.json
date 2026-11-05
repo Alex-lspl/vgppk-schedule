@@ -1,0 +1,7 @@
+{
+  "regions": ["fra1"],
+  "rewrites": [
+    { "source": "/admin", "destination": "/api/admin" },
+    { "source": "/admin/stats", "destination": "/api/admin-stats" }
+  ]
+}
