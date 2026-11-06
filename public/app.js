@@ -561,6 +561,21 @@
   const savedVersion = store.get('appVersion');
   if (savedVersion) showVersion(savedVersion);
 
+  // Сервер ответил, что сайт теперь выключен (503) или закрыт паролем (401). Перезагружаем
+  // страницу — сервер сам покажет заглушку или форму входа. Не чаще раза в 20 секунд, чтобы
+  // при рассинхроне серверов не получилась бесконечная перезагрузка.
+  function gateStopped(res, body) {
+    if (res.status !== 401 && !(res.status === 503 && body && body.maintenance)) return false;
+    let last = 0;
+    try { last = Number(sessionStorage.getItem('gateReload')) || 0; } catch { /* нет доступа к хранилищу */ }
+    if (Date.now() - last > 20000) {
+      try { sessionStorage.setItem('gateReload', String(Date.now())); } catch { /* не страшно */ }
+      location.reload();
+      return true;
+    }
+    return false;
+  }
+
   async function load({ manual = false } = {}) {
     if (loading || !page || view !== 'schedule') return;
     loading = true;
@@ -580,6 +595,7 @@
         throw new Error('Нет связи с сервером.');
       }
       const body = await res.json().catch(() => ({}));
+      if (gateStopped(res, body)) { loading = false; return; }
       if (!res.ok) throw new Error(body.error ? `${body.error}.` : `Ошибка сервера ${res.status}.`);
       if (!Array.isArray(body.weeks)) throw new Error('Сервер вернул неожиданный ответ.');
       json = body;
@@ -700,6 +716,7 @@
     try {
       const res = await fetch('/api/groups');
       const json = await res.json();
+      if (gateStopped(res, json)) return;
       if (!res.ok || !Array.isArray(json.groups)) throw new Error(json.error || 'bad response');
       groups = json.groups.slice().sort(byName);
       store.set(GROUPS_KEY, JSON.stringify(groups));

@@ -1,23 +1,62 @@
 {
-  "regions": ["fra1"],
+  "regions": [
+    "fra1"
+  ],
   "git": {
-    "deploymentEnabled": { "data": false }
+    "deploymentEnabled": {
+      "data": false
+    }
   },
   "functions": {
-    "api/admin-catalog.js": { "maxDuration": 60 }
+    "api/admin-catalog.js": {
+      "maxDuration": 60
+    },
+    "api/gate.js": {
+      "includeFiles": "views/**"
+    }
   },
   "rewrites": [
-    { "source": "/admin", "destination": "/api/admin" },
-    { "source": "/admin/stats", "destination": "/api/admin-stats" }
+    {
+      "source": "/",
+      "destination": "/api/gate"
+    },
+    {
+      "source": "/index.html",
+      "destination": "/api/gate"
+    },
+    {
+      "source": "/admin",
+      "destination": "/api/admin"
+    },
+    {
+      "source": "/admin/stats",
+      "destination": "/api/admin-stats"
+    },
+    {
+      "source": "/admin/settings",
+      "destination": "/api/admin-stats?view=settings"
+    }
   ],
   "headers": [
     {
       "source": "/(.*)",
       "headers": [
-        { "key": "X-Content-Type-Options", "value": "nosniff" },
-        { "key": "X-Frame-Options", "value": "DENY" },
-        { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
-        { "key": "Permissions-Policy", "value": "camera=(), microphone=(), geolocation=()" }
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "X-Frame-Options",
+          "value": "DENY"
+        },
+        {
+          "key": "Referrer-Policy",
+          "value": "strict-origin-when-cross-origin"
+        },
+        {
+          "key": "Permissions-Policy",
+          "value": "camera=(), microphone=(), geolocation=()"
+        }
       ]
     },
     {
@@ -31,7 +70,12 @@
     },
     {
       "source": "/admin-assets/(.*)",
-      "headers": [{ "key": "Cache-Control", "value": "no-cache" }]
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-cache"
+        }
+      ]
     }
   ]
 }

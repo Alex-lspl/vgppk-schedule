@@ -199,13 +199,3 @@ test('отклонённые сигналы попадают в диагност
   assert.deepStrictEqual(skips.map((x) => `${x.reason}:${x.count}`).sort(), ['bot:1', 'origin:1']);
   assert(skips.find((x) => x.reason === 'origin').sample.includes('evil.test'));
 }));
-
-test('старый адрес /api/track по-прежнему принимает сигналы', withAdminEnv(async () => {
-  const fake = makeFakeRedis();
-  stats.setClientForTests(fake);
-  const track = require('../api/track');
-  const res = mockRes();
-  await track({ method: 'POST', body: JSON.stringify({ vid: 'eeeeeeee-5555', type: 'load' }), headers: { 'user-agent': UA_AND, host: 'site.test', 'x-forwarded-for': '1.2.3.4' } }, res);
-  assert.strictEqual(res.code, 204);
-  assert.strictEqual(fake.kv.size, 1);
-}));

@@ -2,6 +2,7 @@
 
 const { hasValidSession, isSameOrigin } = require('../lib/adminAuth');
 const stats = require('../lib/stats');
+const access = require('../lib/access');
 
 // Адрес намеренно называется нейтрально: слово «track» есть в списках блокировщиков рекламы
 // (AdGuard, uBlock, Brave), и такие посетители просто не попадали бы в статистику.
@@ -65,6 +66,14 @@ module.exports = async (req, res) => {
       return;
     }
 
+    // Сайт выключен или закрыт паролем — человек его не видит, учитывать нечего
+    const ev = await access.evaluate(req);
+    if (ev.state !== 'open') {
+      res.setHeader('X-Visit-Skip', 'gate');
+      res.status(204).end();
+      return;
+    }
+
     let body = req.body;
     if (typeof body === 'string') {
       try {
@@ -87,7 +96,7 @@ module.exports = async (req, res) => {
       width: Math.min(5000, Math.max(0, parseInt(body.w, 10) || 0)),
       group: stats.cleanGroup(body.group),
       type: ['load', 'ping', 'leave'].includes(body.type) ? body.type : 'ping',
-    });
+    }, Date.now(), { retentionDays: ev.settings.logs.retentionDays });
   } catch (e) {
     console.error('track failed:', e.message);
   }

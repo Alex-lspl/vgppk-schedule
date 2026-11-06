@@ -33,6 +33,9 @@
     q: '',
     device: '',
     online: '',
+    selected: new Set(), // отмеченные для удаления посетители (id)
+    purgeMode: 'older',
+    purgeDays: 7,
   };
 
   /* ---------- Страны, флаги, IP ---------- */
@@ -225,12 +228,20 @@
     });
   }
 
+  function selBar() {
+    const n = state.selected.size;
+    if (!n) return '';
+    return `<div class="selbar"><span>Выбрано: <b>${n}</b></span><span class="selbar-actions"><button class="btn small danger" type="button" id="delSel">Удалить выбранных</button><button class="btn small" type="button" id="clearSel">Снять выбор</button></span></div>`;
+  }
+
   function visitorsTable() {
     const list = filteredVisitors();
     if (!list.length) return empty(state.data.visitors.length ? 'Ничего не найдено' : 'Пока никто не заходил');
-    return `<div class="table-wrap"><table class="rtable"><thead><tr><th>Страна</th><th>Посетитель</th><th>IP-адрес</th><th>Устройство</th><th>Группы</th><th>Первый визит</th><th>Последний визит</th><th>Статус</th></tr></thead><tbody>${list.map((v) => {
+    const allOn = list.every((v) => state.selected.has(v.id));
+    return `<div class="table-wrap"><table class="rtable"><thead><tr><th class="chk"><input type="checkbox" id="selAll" aria-label="Отметить всех в списке"${allOn ? ' checked' : ''}></th><th>Страна</th><th>Посетитель</th><th>IP-адрес</th><th>Устройство</th><th>Группы</th><th>Первый визит</th><th>Последний визит</th><th>Статус</th></tr></thead><tbody>${list.map((v) => {
       const more = state.revealed.has(v.ip) ? v.ips.filter((x) => x !== v.ip) : [];
-      return `<tr>
+      return `<tr${state.selected.has(v.id) ? ' class="selected"' : ''}>
+        <td class="chk" data-label=""><input type="checkbox" class="sel" data-id="${esc(v.id)}" aria-label="Отметить посетителя #${esc(v.short)}"${state.selected.has(v.id) ? ' checked' : ''}></td>
         <td data-label="Страна">${countryHtml(v.country, v.browser)}</td>
         <td data-label="Посетитель">#${esc(v.short)}</td>
         <td data-label="IP-адрес"><div>${ipHtml(v.ip)}${more.length ? `<div class="ip-all">Раньше: ${esc(more.join(', '))}</div>` : ''}</div></td>
@@ -244,15 +255,16 @@
 
   function viewVisitors() {
     return `<section class="panel">
-      <div class="panel-head"><div><div class="panel-title">История посетителей</div><div class="panel-meta">Посетитель определяется по браузеру и IP · хранение 30 дней</div></div>
+      <div class="panel-head"><div><div class="panel-title">История посетителей</div><div class="panel-meta">Посетитель определяется по браузеру и IP · хранение ${state.data.retentionDays || 30} дн.</div></div>
         <button class="btn small" type="button" id="exportBtn">${ICONS.download}<span>Экспорт CSV</span></button></div>
       <div class="filters">
         <label class="search-wrap">${ICONS.search}<input class="field" id="qInput" type="search" placeholder="Поиск по IP, стране, браузеру или группе" value="${esc(state.q)}"></label>
         <select class="field" id="deviceFilter" aria-label="Устройство"><option value="">Все устройства</option><option value="pc"${state.device === 'pc' ? ' selected' : ''}>Компьютер</option><option value="ios"${state.device === 'ios' ? ' selected' : ''}>iPhone / iPad</option><option value="android"${state.device === 'android' ? ' selected' : ''}>Android</option></select>
         <select class="field" id="onlineFilter" aria-label="Статус"><option value="">Все посетители</option><option value="online"${state.online === 'online' ? ' selected' : ''}>Онлайн</option><option value="offline"${state.online === 'offline' ? ' selected' : ''}>Не в сети</option></select>
       </div>
+      <div id="selbar">${selBar()}</div>
       <div id="vtable">${visitorsTable()}</div>
-      <div class="footnote">IP-адрес скрыт — нажмите на него, чтобы показать полностью. Страна определяется по IP приблизительно: через VPN она будет другой.</div>
+      <div class="footnote">Отметьте галочками тех, кого нужно убрать из журнала, и нажмите «Удалить выбранных». IP-адрес скрыт — нажмите на него, чтобы показать полностью. Страна определяется по IP приблизительно: через VPN она будет другой.</div>
     </section>`;
   }
 
@@ -271,6 +283,48 @@
     a.click();
     a.remove();
     setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  }
+
+  /* ---------- Очистка ---------- */
+
+  function purgeTargets(mode, days) {
+    const cutoff = state.data.now - days * 86400000;
+    return state.data.visitors.filter((v) => (mode === 'older' ? v.last < cutoff : v.last >= cutoff));
+  }
+
+  function viewCleanup(d) {
+    return `
+      <section class="panel">
+        <div class="panel-head"><div><div class="panel-title">Очистка журнала</div>
+          <div class="panel-meta">Сейчас в журнале посетителей: ${fmt(d.visitors.length)} · записи хранятся ${d.retentionDays || 30} дн. и удаляются сами (<a class="link" href="/admin/settings">изменить срок</a>)</div></div></div>
+        <div class="hint">Удалённые записи вернуть нельзя. Если человек зайдёт на сайт снова, он появится в журнале как новый посетитель.</div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-title spaced">Удалить за период</div>
+        <div class="purge-row">
+          <select class="field" id="purgeMode" aria-label="Какие записи удалить">
+            <option value="older"${state.purgeMode === 'older' ? ' selected' : ''}>Старше</option>
+            <option value="recent"${state.purgeMode === 'recent' ? ' selected' : ''}>Только за последние</option>
+          </select>
+          <input class="field" id="purgeDays" type="number" min="0" max="3650" step="1" inputmode="numeric" value="${state.purgeDays}" aria-label="Количество дней">
+          <span class="purge-unit">дн.</span>
+          <button class="btn small danger" type="button" id="purgeBtn">Удалить</button>
+        </div>
+        <div class="hint">Считается по времени последнего визита. «Старше 7 дн.» удалит тех, кто не заходил больше недели; «Только за последние 7 дн.» — тех, кто заходил за эту неделю.</div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-title spaced">Удалить выбранных</div>
+        <div class="hint">На вкладке «Посетители» отметьте нужных людей галочками (можно сузить список поиском и фильтрами) и нажмите «Удалить выбранных».</div>
+        <div class="panel-actions"><button class="btn small" type="button" data-goto="visitors">Перейти к посетителям</button></div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-title spaced">Очистить всё</div>
+        <div class="hint">Удаляются все записи посетителей и счётчик «Не засчитано». Статистика начнётся с нуля.</div>
+        <div class="panel-actions"><button class="btn small danger" type="button" id="clearBtn">Очистить весь журнал</button></div>
+      </section>`;
   }
 
   /* ---------- География ---------- */
@@ -311,7 +365,7 @@
     const d = state.data;
     const view = $('view');
     if (!d || !d.configured) { view.innerHTML = ''; return; }
-    view.innerHTML = state.tab === 'visitors' ? viewVisitors() : state.tab === 'geo' ? viewGeo(d) : viewOverview(d);
+    view.innerHTML = state.tab === 'visitors' ? viewVisitors() : state.tab === 'geo' ? viewGeo(d) : state.tab === 'cleanup' ? viewCleanup(d) : viewOverview(d);
     applyDynamicStyles();
   }
 
@@ -336,9 +390,11 @@
     setNotice('');
     const active = document.activeElement;
     const typing = active && /^(INPUT|SELECT)$/.test(active.tagName) && $('view').contains(active);
+    const present = new Set(d.visitors.map((v) => v.id));
+    state.selected.forEach((id) => { if (!present.has(id)) state.selected.delete(id); });
     if (state.tab === 'visitors') {
       // Фильтры не пересоздаём, чтобы не сбить ввод — обновляем только таблицу
-      if ($('vtable')) $('vtable').innerHTML = visitorsTable(); else renderView();
+      if ($('vtable')) { $('vtable').innerHTML = visitorsTable(); $('selbar').innerHTML = selBar(); } else renderView();
     } else if (!typing) {
       renderView();
     }
@@ -354,6 +410,68 @@
     } catch (e) {
       setNotice(`<b>Не удалось загрузить данные.</b> ${esc(e.message)}`);
     }
+  }
+
+  /* ---------- Действия: очистка журнала ---------- */
+
+  let flashTimer = null;
+  function flash(text, isError) {
+    $('flash').innerHTML = text ? `<div class="flash${isError ? ' err' : ''}">${esc(text)}</div>` : '';
+    clearTimeout(flashTimer);
+    if (text) flashTimer = setTimeout(() => { $('flash').innerHTML = ''; }, 6000);
+  }
+
+  async function post(body) {
+    const res = await fetch('/api/admin-stats', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (res.status === 401) { location.href = '/admin'; return new Promise(() => {}); }
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(json.error || `Ошибка сервера ${res.status}`);
+    return json;
+  }
+
+  async function runCleanup(body, doneText) {
+    try {
+      const r = await post(body);
+      state.selected.clear();
+      flash(`${doneText}: ${r.deleted}.`, false);
+      await load();
+      renderView();
+    } catch (e) {
+      flash(e.message, true);
+    }
+  }
+
+  const plural = (n, a, b, c) => {
+    const m = n % 100, k = n % 10;
+    return m > 10 && m < 20 ? c : k === 1 ? a : k >= 2 && k <= 4 ? b : c;
+  };
+  const people = (n) => `${n} ${plural(n, 'посетителя', 'посетителей', 'посетителей')}`;
+
+  function deleteSelected() {
+    const ids = [...state.selected];
+    if (!ids.length) return;
+    if (!confirm(`Удалить из журнала ${people(ids.length)}? Это нельзя отменить.`)) return;
+    runCleanup({ action: 'stats.delete', ids }, 'Удалено записей');
+  }
+
+  function purgeByPeriod() {
+    const days = Math.max(0, Math.floor(Number(state.purgeDays)));
+    if (!Number.isFinite(days)) { flash('Укажите число дней.', true); return; }
+    const n = purgeTargets(state.purgeMode, days).length;
+    if (!n) { flash('По этому периоду удалять нечего.', false); return; }
+    const what = state.purgeMode === 'older' ? `не заходивших ${days} дн. и дольше` : `заходивших за последние ${days} дн.`;
+    if (!confirm(`Будет удалено ${people(n)} (${what}). Это нельзя отменить. Продолжить?`)) return;
+    runCleanup({ action: 'stats.purge', mode: state.purgeMode, days }, 'Удалено записей');
+  }
+
+  function clearEverything() {
+    const n = state.data.visitors.length;
+    if (!confirm(`Очистить весь журнал? Будет удалено ${people(n)} и счётчики «Не засчитано». Это нельзя отменить.`)) return;
+    runCleanup({ action: 'stats.clear' }, 'Журнал очищен, удалено записей');
   }
 
   /* ---------- События ---------- */
@@ -374,19 +492,39 @@
     }
 
     if (e.target.closest('#exportBtn')) exportCsv();
+    if (e.target.closest('#delSel')) deleteSelected();
+    if (e.target.closest('#clearSel')) { state.selected.clear(); $('vtable').innerHTML = visitorsTable(); $('selbar').innerHTML = selBar(); }
+    if (e.target.closest('#purgeBtn')) purgeByPeriod();
+    if (e.target.closest('#clearBtn')) clearEverything();
   });
 
   document.addEventListener('input', (e) => {
+    if (e.target.id === 'purgeDays') state.purgeDays = e.target.value;
     if (e.target.id === 'qInput') { state.q = e.target.value; $('vtable').innerHTML = visitorsTable(); }
   });
 
   document.addEventListener('change', (e) => {
+    if (e.target.id === 'purgeMode') state.purgeMode = e.target.value;
+    if (e.target.id === 'selAll') {
+      filteredVisitors().forEach((v) => { if (e.target.checked) state.selected.add(v.id); else state.selected.delete(v.id); });
+      $('vtable').innerHTML = visitorsTable();
+      $('selbar').innerHTML = selBar();
+    }
+    if (e.target.classList.contains('sel')) {
+      const id = e.target.dataset.id;
+      if (e.target.checked) state.selected.add(id); else state.selected.delete(id);
+      e.target.closest('tr').classList.toggle('selected', e.target.checked);
+      const all = $('selAll');
+      if (all) all.checked = filteredVisitors().every((v) => state.selected.has(v.id));
+      $('selbar').innerHTML = selBar();
+    }
     if (e.target.id === 'periodSelect') { state.period = Number(e.target.value); renderView(); }
     if (e.target.id === 'deviceFilter') { state.device = e.target.value; $('vtable').innerHTML = visitorsTable(); }
     if (e.target.id === 'onlineFilter') { state.online = e.target.value; $('vtable').innerHTML = visitorsTable(); }
   });
 
   $('view').innerHTML = '<div class="empty">Загрузка…</div>';
+  if (location.hash === '#cleanup') showTab('cleanup');
   load();
   setInterval(() => { if (document.visibilityState === 'visible') load(); }, POLL_MS);
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') load(); });

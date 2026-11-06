@@ -1,0 +1,46 @@
+/* Страница «Настройки сайта». Базовые стили (шапка, панели, кнопки) — из stats.css. */
+
+.app.narrow { max-width: 760px; }
+
+.btn.primary { background: var(--accent); border-color: var(--accent); color: #151515; font-weight: 600; }
+.btn.primary:hover { background: #e48866; border-color: #e48866; }
+.btn.danger { color: #E8A58A; }
+.btn:disabled { opacity: 0.55; cursor: default; }
+
+.switch { display: flex; align-items: flex-start; gap: 12px; cursor: pointer; }
+.switch input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.switch .track { position: relative; flex-shrink: 0; width: 44px; height: 26px; margin-top: 1px; border-radius: 999px; background: #4a4137; transition: background 0.15s ease; }
+.switch .track::after { content: ''; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: #f2ede3; transition: transform 0.15s ease; }
+.switch input:checked + .track { background: var(--accent); }
+.switch input:checked + .track::after { transform: translateX(18px); }
+.switch input:focus-visible + .track { box-shadow: 0 0 0 3px rgba(217, 119, 87, 0.35); }
+.switch input:disabled + .track { opacity: 0.5; }
+.switch .label { font-size: 14px; font-weight: 600; line-height: 1.35; }
+.switch .label small { display: block; margin-top: 3px; font-weight: 400; font-size: 12px; line-height: 1.5; color: var(--muted); }
+
+.group { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--line); display: grid; gap: 12px; }
+.group.off { opacity: 0.55; }
+
+.row { display: grid; gap: 6px; }
+.row > label, .row > .lbl { font-size: 12px; color: var(--muted); }
+.row input.field, .row textarea.field { width: 100%; min-height: 42px; font: inherit; font-size: 16px; }
+.row textarea.field { padding: 10px 11px; min-height: 96px; resize: vertical; line-height: 1.45; }
+.row .count { font-size: 11px; color: var(--muted); text-align: right; }
+.row.num input.field { width: 110px; }
+.cols { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+.hint { font-size: 12px; line-height: 1.55; color: var(--muted); }
+.hint a { color: var(--accent); }
+
+.badge { display: inline-block; margin-left: 8px; padding: 2px 9px; border-radius: 999px; background: #39332f; color: var(--muted); font-size: 11px; font-weight: 500; vertical-align: 2px; }
+.badge.on { background: #3d2a21; color: #E8A58A; }
+
+.actions { margin-top: 18px; display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.status { font-size: 13px; color: #86c79b; }
+.status.err { color: #E8A58A; }
+
+@media (max-width: 560px) {
+  .cols { grid-template-columns: 1fr; }
+  .actions .btn { flex: 1 1 100%; }
+}
+.hint.spaced { margin-top: 10px; }

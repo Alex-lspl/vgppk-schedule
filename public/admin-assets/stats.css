@@ -203,3 +203,33 @@ tbody tr:hover { background: rgba(255,255,255,.02); }
 .skip-row { padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; }
 .skip-top { display: flex; justify-content: space-between; gap: 10px; font-size: 13px; }
 .skip-sample { margin-top: 6px; font-size: 11px; color: var(--muted); word-break: break-all; }
+
+/* ---------- Очистка журнала и выбор посетителей ---------- */
+
+.btn.danger { color: #E8A58A; }
+.btn.danger:hover { border-color: #C2704F; background: #3a2a22; }
+.btn:disabled { opacity: 0.55; cursor: default; }
+
+.link { color: var(--accent); }
+.hint { font-size: 12px; line-height: 1.55; color: var(--muted); }
+.panel-actions { margin-top: 12px; }
+
+.purge-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+.purge-row input.field { width: 88px; }
+.purge-unit { font-size: 13px; color: var(--muted); }
+
+.rtable th.chk, .rtable td.chk { width: 34px; padding-right: 0; }
+.rtable input[type="checkbox"] { width: 17px; height: 17px; accent-color: var(--accent); cursor: pointer; }
+.rtable tr.selected { background: rgba(217, 119, 87, 0.09); }
+
+.selbar { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; padding: 9px 12px; border: 1px solid #6a4535; border-radius: 12px; background: #2f2520; font-size: 13px; }
+.selbar b { color: #E8A58A; }
+.selbar-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+.flash { margin-bottom: 14px; padding: 11px 14px; border: 1px solid #335a42; border-radius: 12px; background: #1f2d25; color: #9be0b1; font-size: 13px; }
+.flash.err { border-color: #6a4535; background: #2f2520; color: #E8A58A; }
+
+@media (max-width: 760px) {
+  .rtable td.chk { justify-content: flex-start; padding-bottom: 2px; }
+  .rtable td.chk::before { content: 'Отметить'; }
+}
