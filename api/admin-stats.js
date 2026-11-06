@@ -46,6 +46,7 @@ async function getStatsJson(req, res) {
       online: stats.countOnline(records),
       maintenance: s.maintenance.enabled,
       restricted: s.access.enabled,
+      captcha: s.captcha.enabled,
     });
     return;
   }

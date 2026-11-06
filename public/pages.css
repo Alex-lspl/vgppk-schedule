@@ -159,3 +159,6 @@ h1 {
 .foot { text-align: center; padding-top: 8px; font-size: 12px; }
 .foot a { color: var(--muted); text-decoration: none; }
 .foot a:hover { color: var(--accent); }
+
+.btn.big { min-height: 54px; padding: 0 38px; font-size: 17px; }
+.error.center { max-width: 360px; margin: 18px auto 0; text-align: left; }

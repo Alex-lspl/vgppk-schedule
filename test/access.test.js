@@ -366,3 +366,160 @@ test('сайт лежит не в public: напрямую, минуя пров�
   assert.strictEqual(dest('/admin/settings'), '/api/admin-stats?view=settings');
   assert(fs.readdirSync(path.join(__dirname, '..', 'api')).filter((f) => f.endsWith('.js')).length <= 12, 'не больше 12 функций (лимит бесплатного тарифа Vercel)');
 });
+
+/* ---------- Проверка «Я не робот» ---------- */
+
+const crypto = require('node:crypto');
+const captcha = require('../lib/captcha');
+
+function solve(token) {
+  let nonce = 0;
+  while (captcha.leadingZeroBits(crypto.createHash('sha256').update(`${token}:${nonce}`).digest()) < captcha.DIFFICULTY_BITS) nonce += 1;
+  return nonce;
+}
+const ipReq = (ip, extra = {}) => ({ headers: { host: 'site.test', 'user-agent': UA, 'x-forwarded-for': ip, ...extra } });
+
+test('капча: настройки проверяются', () => {
+  const cur = settings.defaults();
+  assert.strictEqual(cur.captcha.enabled, false);
+  assert.strictEqual(cur.captcha.ttlHours, 24);
+  const bad = (h) => assert.throws(() => settings.applyUpdate(cur, { captcha: { ttlHours: h } }), (e) => e instanceof settings.ValidationError);
+  bad(0); bad(721); bad(1.5); bad('abc');
+  const ok = settings.applyUpdate(cur, { captcha: { enabled: true, ttlHours: 168 } });
+  assert.deepStrictEqual(ok.captcha, { enabled: true, ttlHours: 168 });
+  assert.deepStrictEqual(settings.publicView(ok).captcha, { enabled: true, ttlHours: 168 });
+});
+
+test('капча: решение проверяется — подпись, скорость, IP, настоящее нажатие, работа', withAdminEnv(async () => {
+  setup();
+  const req = ipReq('5.5.5.5');
+  const now = Date.now();
+  const token = captcha.issueChallenge(req, now - 2000);
+  const nonce = solve(token);
+  const v = (r, extra = {}) => captcha.verifySolution(r, { token, nonce, trusted: true, ...extra }, now);
+
+  assert.deepStrictEqual(v(req), { ok: true });
+  assert.strictEqual(v(req, { trusted: false }).reason, 'not-a-click');
+  assert.strictEqual(v(ipReq('6.6.6.6')).reason, 'other-ip', 'задача привязана к IP');
+  assert.strictEqual(v(req, { token: token.slice(0, -2) + 'aa' }).reason, 'bad-signature');
+  assert.strictEqual(captcha.verifySolution(req, { token: captcha.issueChallenge(req, now), nonce, trusted: true }, now).reason, 'too-fast', 'нельзя решить мгновенно');
+  assert.strictEqual(captcha.verifySolution(req, { token: captcha.issueChallenge(req, now - 11 * 60 * 1000), nonce, trusted: true }, now).reason, 'expired');
+  assert.strictEqual(v(req, { nonce: 'abc' }).reason, 'bad-nonce');
+  // подобранное «на авось» число почти наверняка не подходит
+  let wrong = 0;
+  while (captcha.leadingZeroBits(crypto.createHash('sha256').update(`${token}:${wrong}`).digest()) >= captcha.DIFFICULTY_BITS) wrong += 1;
+  assert.strictEqual(v(req, { nonce: wrong }).reason, 'bad-work');
+  // IPv6: устройства одной сети /64 считаются одним посетителем
+  const t6 = captcha.issueChallenge(ipReq('2a00:1fa0:42b:7b2c::1'), now - 2000);
+  assert.deepStrictEqual(captcha.verifySolution(ipReq('2a00:1fa0:42b:7b2c::9'), { token: t6, nonce: solve(t6), trusted: true }, now), { ok: true });
+}));
+
+test('капча: cookie привязана к IP и сроку, админ проходит без проверки', withAdminEnv(async () => {
+  setup();
+  await settings.update({ captcha: { enabled: true, ttlHours: 2 } });
+  const req = ipReq('5.5.5.5');
+  assert.strictEqual((await access.evaluate(req)).state, 'captcha');
+  assert.strictEqual((await access.evaluate(ipReq('5.5.5.5', { cookie: adminCookie() }))).state, 'open');
+
+  const cookie = captcha.makeCookie(req, 2).split(';')[0];
+  assert(captcha.makeCookie(req, 2).includes(`Max-Age=${2 * 3600}`), 'срок из настроек');
+  assert.strictEqual((await access.evaluate(ipReq('5.5.5.5', { cookie }))).state, 'open');
+  assert.strictEqual((await access.evaluate(ipReq('7.7.7.7', { cookie }))).state, 'captcha', 'новый IP — проверка снова');
+  assert.strictEqual(captcha.hasPassed(ipReq('5.5.5.5', { cookie }), Date.now() + 3 * 3600 * 1000), false, 'через 2 часа — снова');
+
+  // порядок: заглушка → проверка → пароль
+  await settings.update({ access: { enabled: true, user: 'student', password: 'secret1' } });
+  assert.strictEqual((await access.evaluate(req)).state, 'captcha', 'боты не видят даже форму входа');
+  assert.strictEqual((await access.evaluate(ipReq('5.5.5.5', { cookie }))).state, 'login');
+  await settings.update({ maintenance: { enabled: true } });
+  assert.strictEqual((await access.evaluate(req)).state, 'maintenance');
+  assert.strictEqual(captcha.formatTtl(24), '24 ч');
+  assert.strictEqual(captcha.formatTtl(168), '7 дн.');
+}));
+
+test('gate: страница проверки, прохождение, провал и API', withAdminEnv(async () => {
+  setup();
+  await settings.update({ captcha: { enabled: true, ttlHours: 6 } });
+  const gate = require('../api/gate');
+  const base = { host: 'site.test', origin: 'https://site.test', 'user-agent': UA, 'x-forwarded-for': '9.9.9.9' };
+
+  let res = mockRes();
+  await gate({ method: 'GET', query: {}, headers: base }, res);
+  assert.strictEqual(res.code, 200);
+  assert(res.body.includes('id="humanBtn"') && res.body.includes('data-challenge="') && !res.body.includes('id="homeView"'));
+  assert(res.body.includes('на 6 ч'), 'срок показан посетителю');
+  const token = /data-challenge="([^"]+)"/.exec(res.body)[1];
+
+  // API без проверки не отдаёт данные
+  for (const handler of [require('../api/groups'), require('../api/schedule')]) {
+    const r = mockRes();
+    await handler({ method: 'GET', query: { page: 'bg203' }, headers: base }, r);
+    assert.strictEqual(r.code, 403);
+    assert.strictEqual(r.body.captcha, true);
+  }
+
+  // слишком быстрое решение — отказ
+  res = mockRes();
+  await gate({ method: 'POST', query: {}, headers: base, body: { action: 'captcha', token, nonce: solve(token), trusted: true } }, res);
+  assert.strictEqual(res.code, 400);
+  assert(!res.headers['set-cookie']);
+
+  // решение токена, выданного 3 секунды назад
+  const old = captcha.issueChallenge({ headers: base }, Date.now() - 3000);
+  res = mockRes();
+  await gate({ method: 'POST', query: {}, headers: base, body: { action: 'captcha', token: old, nonce: solve(old), trusted: true } }, res);
+  assert.strictEqual(res.code, 200);
+  const cookie = res.headers['set-cookie'].split(';')[0];
+  assert(res.headers['set-cookie'].includes(`Max-Age=${6 * 3600}`));
+
+  res = mockRes();
+  await gate({ method: 'GET', query: {}, headers: { ...base, cookie } }, res);
+  assert(res.body.includes('id="homeView"'), 'с cookie открывается сайт');
+
+  res = mockRes();
+  await gate({ method: 'POST', query: {}, headers: { ...base, origin: 'https://evil.test' }, body: { action: 'captcha', token: old, nonce: 1, trusted: true } }, res);
+  assert.strictEqual(res.code, 403, 'чужой origin');
+
+  await new Promise((r) => setTimeout(r, 50)); // счётчики пишутся без ожидания
+  const skips = Object.fromEntries((await stats.loadSkips()).map((x) => [x.reason, x.count]));
+  assert.strictEqual(skips['captcha-shown'], 1);
+  assert.strictEqual(skips['captcha-passed'], 1);
+  assert.strictEqual(skips['captcha-failed'], 1);
+}));
+
+/* ---------- «Не засчитано»: только последние 24 часа ---------- */
+
+test('диагностика хранит только 24 часа и не полные логи', async () => {
+  const fake = setup();
+  const T = Date.UTC(2026, 10, 6, 12, 0, 0);
+  const H = 3600 * 1000;
+  await stats.noteSkip('admin', stats.describeClient(UA), T - 30 * H); // 30 часов назад — уже не считается
+  await stats.noteSkip('admin', stats.describeClient(UA), T - 2 * H);
+  await stats.noteSkip('admin', stats.describeClient(UA), T - 1 * H);
+  await stats.noteSkip('bot', 'Googlebot/2.1', T);
+  await stats.noteSkip('что-то-другое', 'x', T); // неизвестная причина игнорируется
+
+  const skips = await stats.loadSkips(T);
+  assert.deepStrictEqual(skips.map((x) => `${x.reason}:${x.count}`).sort(), ['admin:2', 'bot:1']);
+  assert.strictEqual(skips.find((x) => x.reason === 'admin').sample, 'Chrome · Windows / ПК', 'пример — «браузер · система», а не длинная строка');
+  assert.strictEqual(skips.find((x) => x.reason === 'bot').sample, 'Googlebot/2.1');
+
+  const lastKey = [...fake.kv.keys()].find((k) => k.startsWith('stats:skip-last:admin'));
+  assert.strictEqual(fake.ttl.get(lastKey), 24 * 3600, 'пример живёт сутки');
+  const bucket = [...fake.kv.keys()].find((k) => k.startsWith('stats:skip:admin:'));
+  assert.strictEqual(fake.ttl.get(bucket), 25 * 3600, 'часовая корзина удаляется сама через 25 часов');
+  assert.strictEqual(stats.describeClient('Mozilla/5.0 (Windows NT 10.0) Chrome/152 YaBrowser/26.10 Safari/537.36'), 'Яндекс Браузер · Windows / ПК');
+});
+
+/* ---------- Боковое меню ---------- */
+
+test('боковое меню подключено на всех трёх страницах админки', () => {
+  const { adminPageHtml } = require('../lib/adminPage');
+  const { statsPageHtml } = require('../lib/statsPage');
+  const { settingsPageHtml } = require('../lib/settingsPage');
+  for (const html of [adminPageHtml(), statsPageHtml(), settingsPageHtml()]) {
+    assert(html.includes('/admin-assets/nav.js') && html.includes('/admin-assets/nav.css'));
+    assert(!/<script(?![^>]*\bsrc=)[^>]*>/.test(html), 'без встроенных скриптов (CSP)');
+  }
+  for (const f of ['nav.js', 'nav.css']) assert(fs.existsSync(path.join(__dirname, '..', 'public', 'admin-assets', f)));
+});

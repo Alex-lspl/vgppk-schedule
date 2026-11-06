@@ -76,6 +76,22 @@
       '</section>' +
 
       '<section class="panel">' +
+        '<div class="panel-head"><div><div class="panel-title">Проверка «Я не робот»' + badge(cfg.captcha.enabled, 'включено') + '</div>' +
+        '<div class="panel-meta">Чтобы отсеять ботов и случайные скрипты</div></div></div>' +
+        '<label class="switch"><input type="checkbox" id="cEnabled"' + (cfg.captcha.enabled ? ' checked' : '') + dis + '>' +
+          '<span class="track"></span>' +
+          '<span class="label">Просить нажать кнопку при заходе на сайт' +
+            '<small>Новый посетитель видит страницу с кнопкой «Я не робот», после нажатия попадает на сайт. Проверка привязана к IP-адресу: при заходе с нового адреса (например, после смены Wi-Fi на мобильный интернет) она покажется снова. Вас, пока вошли в админку, проверка не касается.</small></span></label>' +
+        '<div class="group" id="cGroup">' +
+          '<div class="row num"><label for="cHours">Повторять проверку через, часов</label>' +
+            '<input class="field" id="cHours" type="number" min="1" max="720" step="1" inputmode="numeric" value="' + esc(cfg.captcha.ttlHours) + '"' + dis + '></div>' +
+          '<div class="hint">От 1 до 720 часов (30 дней). 24 — раз в сутки, 168 — раз в неделю. ' +
+            'Это защита от простых скриптов и «глупых» ботов; от целенаправленного бота с настоящим браузером она не спасает. ' +
+            'Сколько проверок показано и пройдено за сутки, видно на странице <a href="/admin/stats">статистики</a> в блоке «Не засчитано».</div>' +
+        '</div>' +
+      '</section>' +
+
+      '<section class="panel">' +
         '<div class="panel-head"><div><div class="panel-title">Журнал посещений</div>' +
         '<div class="panel-meta">Сколько хранить записи о посетителях</div></div></div>' +
         '<div class="row num"><label for="lDays">Хранить, дней</label>' +
@@ -95,6 +111,7 @@
     if (!$('mEnabled')) return;
     $('mGroup').classList.toggle('off', !$('mEnabled').checked);
     $('aGroup').classList.toggle('off', !$('aEnabled').checked);
+    $('cGroup').classList.toggle('off', !$('cEnabled').checked);
   }
 
   function updateCount() {
@@ -120,11 +137,12 @@
       settings: {
         maintenance: { enabled: $('mEnabled').checked, message: $('mMessage').value },
         access: { enabled: $('aEnabled').checked, user: $('aUser').value, password: $('aPass').value },
+        captcha: { enabled: $('cEnabled').checked, ttlHours: Number($('cHours').value) },
         logs: { retentionDays: Number($('lDays').value) },
       },
     }).then(function (json) {
       var purged = json.purged ? ' Удалено старых записей журнала: ' + json.purged + '.' : '';
-      cfg = { configured: true, maintenance: json.maintenance, access: json.access, logs: json.logs };
+      cfg = { configured: true, maintenance: json.maintenance, access: json.access, captcha: json.captcha, logs: json.logs };
       status = { text: 'Сохранено. Изменения заработают в течение 15 секунд.' + purged, error: false };
       render();
     }).catch(function (e) {
@@ -145,7 +163,7 @@
     if (e.target.closest('#revokeBtn')) revoke();
   });
   document.addEventListener('change', function (e) {
-    if (e.target.id === 'mEnabled' || e.target.id === 'aEnabled') syncGroups();
+    if (e.target.id === 'mEnabled' || e.target.id === 'aEnabled' || e.target.id === 'cEnabled') syncGroups();
   });
   document.addEventListener('input', function (e) {
     if (e.target.id === 'mMessage') updateCount();

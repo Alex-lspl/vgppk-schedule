@@ -233,3 +233,4 @@ tbody tr:hover { background: rgba(255,255,255,.02); }
   .rtable td.chk { justify-content: flex-start; padding-bottom: 2px; }
   .rtable td.chk::before { content: 'Отметить'; }
 }
+.hint.spaced { margin-top: 10px; }

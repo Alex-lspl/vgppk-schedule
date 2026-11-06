@@ -7,6 +7,8 @@ const access = require('../lib/access');
 const auth = require('../lib/adminAuth');
 const limiter = require('../lib/rateLimit');
 const pages = require('../lib/pages');
+const captcha = require('../lib/captcha');
+const stats = require('../lib/stats');
 
 // «Привратник» сайта. Страница сайта лежит не в public/ (оттуда Vercel отдаёт файлы напрямую,
 // минуя любые проверки), а в views/, и открывается только через эту функцию:
@@ -25,7 +27,20 @@ function loadIndex() {
 
 // Студенты выходят в сеть с одного IP колледжа, поэтому лимит щедрее, чем у входа админа
 const visitorLimiter = limiter.createLimiter({ maxFailures: 20, windowMs: 15 * 60 * 1000 });
+// Ошибки проверки «не робот» (неверное решение) считаются отдельно от ошибок входа
+const captchaLimiter = limiter.createLimiter({ maxFailures: 30, windowMs: 15 * 60 * 1000 });
 const FAILURE_DELAY_MS = 600;
+
+// «Показана проверка» считаем не чаще раза в 10 минут с одного IP, чтобы бот, который
+// перезагружает страницу в цикле, не расходовал лимит команд базы
+const shownRecently = new Map();
+function countShown(req, now = Date.now()) {
+  const ip = limiter.clientIp(req);
+  if (shownRecently.size > 5000) shownRecently.clear();
+  if ((shownRecently.get(ip) || 0) > now) return;
+  shownRecently.set(ip, now + 10 * 60 * 1000);
+  stats.noteSkip('captcha-shown', stats.describeClient(String(req.headers['user-agent'] || ''))).catch(() => {});
+}
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 function sendHtml(res, status, html, extra = {}) {
@@ -36,6 +51,36 @@ function sendHtml(res, status, html, extra = {}) {
   res.status(status).send(html);
 }
 
+async function solveCaptcha(req, res, ev, body) {
+  // Проверка уже пройдена (или не нужна) — просто пускаем
+  if (ev.state !== 'captcha') {
+    res.status(200).json({ ok: true });
+    return;
+  }
+
+  const ip = limiter.clientIp(req);
+  const state = captchaLimiter.check(ip);
+  if (!state.allowed) {
+    res.setHeader('Retry-After', String(state.retryAfterSec));
+    res.status(429).json({ error: 'Слишком много попыток. Повторите через несколько минут.' });
+    return;
+  }
+
+  const result = captcha.verifySolution(req, { token: body.token, nonce: body.nonce, trusted: body.trusted });
+  if (!result.ok) {
+    captchaLimiter.recordFailure(ip);
+    stats.noteSkip('captcha-failed', `${result.reason} | ${stats.describeClient(String(req.headers['user-agent'] || ''))}`).catch(() => {});
+    await sleep(FAILURE_DELAY_MS);
+    res.status(400).json({ error: 'Проверка не пройдена. Обновите страницу и попробуйте ещё раз.' });
+    return;
+  }
+
+  captchaLimiter.reset(ip);
+  stats.noteSkip('captcha-passed', stats.describeClient(String(req.headers['user-agent'] || ''))).catch(() => {});
+  res.setHeader('Set-Cookie', captcha.makeCookie(req, ev.settings.captcha.ttlHours));
+  res.status(200).json({ ok: true });
+}
+
 async function login(req, res) {
   res.setHeader('Cache-Control', 'no-store');
   if (!auth.isSameOrigin(req)) {
@@ -44,8 +89,17 @@ async function login(req, res) {
   }
 
   const ev = await access.evaluate(req);
+  const body = req.body && typeof req.body === 'object' ? req.body : {};
+  if (body.action === 'captcha') {
+    await solveCaptcha(req, res, ev, body);
+    return;
+  }
   if (ev.state === 'maintenance') {
     res.status(503).json({ error: 'Сайт временно не работает.', maintenance: true });
+    return;
+  }
+  if (ev.state === 'captcha') {
+    res.status(403).json({ error: 'Сначала нужно пройти проверку.', captcha: true });
     return;
   }
   if (ev.state === 'open') {
@@ -61,7 +115,6 @@ async function login(req, res) {
     return;
   }
 
-  const body = req.body && typeof req.body === 'object' ? req.body : {};
   const loginName = String(body.login || '').slice(0, 200);
   const password = String(body.password || '').slice(0, 500);
 
@@ -96,6 +149,11 @@ module.exports = async (req, res) => {
 
   if (ev.state === 'maintenance') {
     sendHtml(res, 503, pages.maintenanceHtml(ev.settings.maintenance.message), { 'Retry-After': '300' });
+    return;
+  }
+  if (ev.state === 'captcha') {
+    countShown(req);
+    sendHtml(res, 200, pages.captchaHtml(captcha.issueChallenge(req), captcha.formatTtl(ev.settings.captcha.ttlHours)));
     return;
   }
   if (ev.state === 'login') {

@@ -561,11 +561,12 @@
   const savedVersion = store.get('appVersion');
   if (savedVersion) showVersion(savedVersion);
 
-  // Сервер ответил, что сайт теперь выключен (503) или закрыт паролем (401). Перезагружаем
+  // Сервер ответил, что сайт теперь выключен (503), закрыт паролем (401) или нужна проверка «не робот» (403). Перезагружаем
   // страницу — сервер сам покажет заглушку или форму входа. Не чаще раза в 20 секунд, чтобы
   // при рассинхроне серверов не получилась бесконечная перезагрузка.
   function gateStopped(res, body) {
-    if (res.status !== 401 && !(res.status === 503 && body && body.maintenance)) return false;
+    const needsGate = res.status === 401 || (res.status === 503 && body && body.maintenance) || (res.status === 403 && body && body.captcha);
+    if (!needsGate) return false;
     let last = 0;
     try { last = Number(sessionStorage.getItem('gateReload')) || 0; } catch { /* нет доступа к хранилищу */ }
     if (Date.now() - last > 20000) {

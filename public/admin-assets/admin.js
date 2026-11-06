@@ -395,7 +395,7 @@
       '</a>' +
       '<a class="statsrow" href="/admin/settings">' +
         '<span class="live-dot off" id="siteDot"></span>' +
-        '<span class="statsrow-text"><b>Настройки сайта</b><span id="siteSub">Работа сайта, доступ по паролю, журнал</span></span>' +
+        '<span class="statsrow-text"><b>Настройки сайта</b><span id="siteSub">Работа сайта, доступ, проверка, журнал</span></span>' +
         '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>' +
       '</a>' +
       '<div class="layout">' +
@@ -933,42 +933,35 @@
 
   /* ---------- Карточка «Сейчас онлайн» ---------- */
 
-  // Вторая карточка: коротко показывает, не выключен ли сайт и не закрыт ли он паролем
-  function showSiteState(j) {
-    var dot = qs('siteDot'), sub = qs('siteSub');
-    if (!dot || !sub) return;
-    if (j.maintenance) {
-      dot.className = 'live-dot warn';
-      sub.textContent = 'Сайт выключен для посетителей';
-    } else if (j.restricted) {
-      dot.className = 'live-dot';
-      sub.textContent = 'Вход на сайт по паролю включён';
-    } else {
-      dot.className = 'live-dot off';
-      sub.textContent = 'Работа сайта, доступ по паролю, журнал';
+  // Карточки вверху страницы (на телефоне и узких окнах). Данные приходят от бокового меню
+  // (nav.js): оно раз в минуту запрашивает краткую сводку и рассылает событие admin:brief.
+  function applyBrief(j) {
+    if (!j) return;
+    var dot = qs('liveDot'), text = qs('onlineText'), sub = qs('onlineSub');
+    var siteDot = qs('siteDot'), siteSub = qs('siteSub');
+    if (siteDot && siteSub) {
+      if (j.maintenance) {
+        siteDot.className = 'live-dot warn';
+        siteSub.textContent = 'Сайт выключен для посетителей';
+      } else if (j.restricted || j.captcha) {
+        siteDot.className = 'live-dot';
+        siteSub.textContent = j.restricted && j.captcha ? 'Включены пароль и проверка «не робот»'
+          : j.restricted ? 'Вход на сайт по паролю включён' : 'Проверка «Я не робот» включена';
+      } else {
+        siteDot.className = 'live-dot off';
+        siteSub.textContent = 'Работа сайта, доступ, проверка, журнал';
+      }
     }
-  }
-
-  function pollOnline() {
-    if (document.visibilityState !== 'visible') return;
-    fetch('/api/admin-stats?json=1&brief=1', { cache: 'no-store' })
-      .then(function (r) { return r.ok ? r.json() : null; })
-      .then(function (j) {
-        if (!j) return;
-        var dot = qs('liveDot'), text = qs('onlineText'), sub = qs('onlineSub');
-        if (!dot || !text || !sub) return;
-        showSiteState(j);
-        if (!j.configured) {
-          dot.className = 'live-dot off';
-          text.textContent = 'Статистика посещений';
-          sub.textContent = 'Не подключена — см. README';
-          return;
-        }
-        dot.className = 'live-dot' + (j.online > 0 ? '' : ' off');
-        text.textContent = 'Сейчас онлайн: ' + j.online;
-        sub.textContent = 'Открыть статистику посещений';
-      })
-      .catch(function () { /* карточка — необязательная часть страницы */ });
+    if (!dot || !text || !sub) return;
+    if (!j.configured) {
+      dot.className = 'live-dot off';
+      text.textContent = 'Статистика посещений';
+      sub.textContent = 'Не подключена — см. README';
+      return;
+    }
+    dot.className = 'live-dot' + (j.online > 0 ? '' : ' off');
+    text.textContent = 'Сейчас онлайн: ' + j.online;
+    sub.textContent = 'Открыть статистику посещений';
   }
 
   function loadCatalog() {
@@ -987,9 +980,8 @@
   function init() {
     renderShell();
     bindStatic();
-    pollOnline();
-    setInterval(pollOnline, 60000);
-    document.addEventListener('visibilitychange', pollOnline);
+    document.addEventListener('admin:brief', function (e) { applyBrief(e.detail); });
+    if (window.AdminNav && window.AdminNav.last) applyBrief(window.AdminNav.last);
     setStatus('Загрузка каталога…');
     var page = store('admin:page') || DEFAULT_PAGE;
     var catalogReady = loadCatalog();

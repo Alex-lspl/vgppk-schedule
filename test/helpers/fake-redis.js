@@ -12,8 +12,9 @@ module.exports = function makeFake() {
     async hincrby(k, f, n) { calls.push('hincrby'); if (!h.has(k)) h.set(k, {}); h.get(k)[f] = (Number(h.get(k)[f]) || 0) + n; return h.get(k)[f]; },
     async hset(k, obj) { calls.push('hset'); if (!h.has(k)) h.set(k, {}); Object.assign(h.get(k), obj); return Object.keys(obj).length; },
     async hgetall(k) { calls.push('hgetall'); return h.has(k) ? { ...h.get(k) } : null; },
-    async expire() { calls.push('expire'); return 1; },
+    async expire(k, sec) { calls.push('expire'); ttl.set(k, sec); return 1; },
     async del(...keys) { calls.push('del'); let n = 0; for (const k of keys) { if (kv.delete(k)) n++; if (z.delete(k)) n++; if (h.delete(k)) n++; } return n; },
+    async incr(k) { calls.push('incr'); const n = (Number(kv.get(k)) || 0) + 1; kv.set(k, String(n)); return n; },
     async zrem(k, ...m) { calls.push('zrem'); m.forEach((x) => z.get(k) && z.get(k).delete(x)); return m.length; },
   };
 };

@@ -176,12 +176,12 @@ test('visit: админ, чужой origin и боты не учитываютс
   await track({ ...base, headers: { ...base.headers, origin: 'https://evil.test' } }, mockRes());
   await track({ ...base, headers: { ...base.headers, 'user-agent': 'Googlebot/2.1' } }, mockRes());
   await track({ ...base, headers: { ...base.headers, cookie: auth.makeSessionCookie().split(';')[0] } }, mockRes());
-  assert.strictEqual(fake.kv.size, 0, 'ничего не записано');
+  assert.strictEqual([...fake.kv.keys()].filter((k) => k.startsWith('stats:v:')).length, 0, 'посетитель не записан');
 
   const res = mockRes();
   await track({ ...base, headers: { ...base.headers, origin: 'https://site.test', 'x-vercel-ip-country': 'ru' } }, res);
   assert.strictEqual(res.code, 204);
-  assert.strictEqual(fake.kv.size, 1, 'обычный заход записан');
+  assert.strictEqual([...fake.kv.keys()].filter((k) => k.startsWith('stats:v:')).length, 1, 'обычный заход записан');
   const rec = JSON.parse(fake.kv.get('stats:v:dddddddd-4444'));
   assert.strictEqual(rec.country, 'RU');
   assert.strictEqual(rec.ip, '95.1.2.3');

@@ -165,16 +165,20 @@
   }
 
   const SKIP_LABELS = {
-    bot: 'Принят за бота (по User-Agent)',
-    origin: 'Запрос с чужого адреса (Origin)',
-    admin: 'Вы были залогинены в админке',
+    admin: 'Ваши собственные заходы (вы вошли в админку)',
+    bot: 'Определены как боты (по названию браузера)',
+    origin: 'Запросы с чужого сайта',
+    'captcha-shown': 'Показана проверка «Я не робот»',
+    'captcha-passed': 'Проверку прошли',
+    'captcha-failed': 'Проверку не прошли',
   };
 
   function skipsPanel(d) {
     const list = d.skips || [];
     if (!list.length) return '';
-    return `<section class="panel"><div class="panel-head"><div><div class="panel-title">Не засчитано</div><div class="panel-meta">Сигналы, которые сервер отклонил, за 30 дней. Нужно, чтобы понять, почему кого-то не видно.</div></div></div>
-      <div class="skip-list">${list.map((x) => `<div class="skip-row"><div class="skip-top"><span>${esc(SKIP_LABELS[x.reason] || x.reason)}</span><b>${fmt(x.count)}</b></div>${x.sample ? `<div class="skip-sample">Последний: ${esc(x.sample)}</div>` : ''}</div>`).join('')}</div></section>`;
+    return `<section class="panel"><div class="panel-head"><div><div class="panel-title">Не засчитано · 24 часа</div><div class="panel-meta">Сигналы, которые сервер отклонил или учёл отдельно. Хранятся только счётчики и по одному последнему примеру, не полные логи, и только сутки.</div></div></div>
+      <div class="skip-list">${list.map((x) => `<div class="skip-row"><div class="skip-top"><span>${esc(SKIP_LABELS[x.reason] || x.reason)}</span><b>${fmt(x.count)}</b></div>${x.sample ? `<div class="skip-sample">Последний пример: ${esc(x.sample)}</div>` : ''}</div>`).join('')}</div>
+      <div class="hint spaced">Число — это сигналы, а не люди: открытая страница шлёт сигнал раз в 30 секунд, поэтому один ваш открытый экран даёт десятки отметок.</div></section>`;
   }
 
   function viewOverview(d) {

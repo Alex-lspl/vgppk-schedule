@@ -59,7 +59,9 @@ module.exports = async (req, res) => {
       res.setHeader('X-Visit-Skip', skip);
       // Причины, которые стоит видеть в статистике (флуд и отсутствие базы не пишем)
       if (skip === 'origin' || skip === 'bot' || skip === 'admin') {
-        const sample = skip === 'origin' ? `origin=${req.headers.origin || '-'} host=${req.headers.host || '-'} | ${ua}` : ua;
+        const sample = skip === 'origin' ? `origin=${req.headers.origin || '-'} host=${req.headers.host || '-'} | ${ua}`
+          : skip === 'bot' ? ua // у бота полезно видеть его настоящее имя
+          : stats.describeClient(ua);
         await stats.noteSkip(skip, sample).catch(() => {});
       }
       res.status(204).end();
