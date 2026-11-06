@@ -1,127 +1,169 @@
 {
   "bg203": {
-    "2026-W44": {
+    "2026-W46": {
       "days": {
-        "1": [
+        "0": [
           {
             "pair": 1,
-            "subject": "Ин. язык в ПД",
-            "teacher": "Рыжкова Н.И.",
-            "room": "355",
-            "subgroup": 2,
-            "note": null
+            "subject": "Практика",
+            "teacher": "Калашников Н.В.",
+            "room": "КФЗ",
+            "subgroup": null,
+            "note": null,
+            "changedAt": "2026-11-06T11:28:24.657Z",
+            "changeSource": "manual"
           },
           {
             "pair": 2,
-            "subject": "ГрафДизаин и Мультимедиа",
-            "teacher": "Семичева А.Г.",
-            "room": "132",
+            "subject": "Практика",
+            "teacher": "Калашников Н.В.",
+            "room": "КФЗ",
             "subgroup": null,
             "note": null,
-            "changedAt": "2026-10-26T14:16:06.734Z",
+            "changedAt": "2026-11-06T11:28:24.657Z",
             "changeSource": "manual"
           },
           {
             "pair": 3,
-            "subject": "ГрафДизаин и Мультимедиа",
-            "teacher": "Семичева А.Г.",
-            "room": "132",
+            "subject": "Практика",
+            "teacher": "Калашников Н.В.",
+            "room": "КФЗ",
             "subgroup": null,
             "note": null,
-            "changedAt": "2026-10-26T14:16:06.734Z",
+            "changedAt": "2026-11-06T11:28:24.657Z",
+            "changeSource": "manual"
+          }
+        ],
+        "1": [
+          {
+            "pair": 1,
+            "subject": "Практика",
+            "teacher": "Калашников Н.В.",
+            "room": "КФЗ",
+            "subgroup": null,
+            "note": null,
+            "changedAt": "2026-11-06T11:28:24.657Z",
             "changeSource": "manual"
           },
           {
-            "pair": 4,
-            "subject": "ГрафДизаин и Мультимедиа",
-            "teacher": "Семичева А.Г.",
-            "room": "132",
+            "pair": 2,
+            "subject": "Практика",
+            "teacher": "Калашников Н.В.",
+            "room": "КФЗ",
             "subgroup": null,
             "note": null,
-            "changedAt": "2026-10-26T14:16:06.734Z",
+            "changedAt": "2026-11-06T11:28:24.657Z",
+            "changeSource": "manual"
+          },
+          {
+            "pair": 3,
+            "subject": "Практика",
+            "teacher": "Калашников Н.В.",
+            "room": "КФЗ",
+            "subgroup": null,
+            "note": null,
+            "changedAt": "2026-11-06T11:28:24.657Z",
             "changeSource": "manual"
           }
         ],
         "2": [
           {
             "pair": 1,
-            "subject": "Прав обесп",
-            "teacher": "Изотова А.Р.",
-            "room": "228",
+            "subject": "Практика",
+            "teacher": "Калашников Н.В.",
+            "room": "КФЗ",
             "subgroup": null,
-            "note": null
+            "note": null,
+            "changedAt": "2026-11-06T11:28:24.657Z",
+            "changeSource": "manual"
           },
           {
             "pair": 2,
-            "subject": "Прав обесп",
-            "teacher": "Изотова А.Р.",
-            "room": "228",
+            "subject": "Практика",
+            "teacher": "Калашников Н.В.",
+            "room": "КФЗ",
             "subgroup": null,
             "note": null,
-            "changedAt": "2026-10-27T19:46:37.921Z",
+            "changedAt": "2026-11-06T11:28:24.657Z",
             "changeSource": "manual"
           },
           {
             "pair": 3,
-            "subject": "Прав обесп",
-            "teacher": "Изотова А.Р.",
-            "room": "228",
+            "subject": "Практика",
+            "teacher": "Калашников Н.В.",
+            "room": "КФЗ",
             "subgroup": null,
             "note": null,
-            "changedAt": "2026-10-27T19:46:37.921Z",
+            "changedAt": "2026-11-06T11:28:24.657Z",
+            "changeSource": "manual"
+          }
+        ],
+        "3": [
+          {
+            "pair": 1,
+            "subject": "Практика",
+            "teacher": "Калашников Н.В.",
+            "room": "КФЗ",
+            "subgroup": null,
+            "note": null,
+            "changedAt": "2026-11-06T11:28:24.657Z",
             "changeSource": "manual"
           },
           {
-            "pair": 4,
-            "subject": "ГрафДизаин и Мультимедиа",
-            "teacher": "Семичева А.Г.",
-            "room": "132",
+            "pair": 2,
+            "subject": "Практика",
+            "teacher": "Калашников Н.В.",
+            "room": "КФЗ",
             "subgroup": null,
             "note": null,
-            "changedAt": "2026-10-27T19:46:37.921Z",
+            "changedAt": "2026-11-06T11:28:24.657Z",
+            "changeSource": "manual"
+          },
+          {
+            "pair": 3,
+            "subject": "Практика",
+            "teacher": "Калашников Н.В.",
+            "room": "КФЗ",
+            "subgroup": null,
+            "note": null,
+            "changedAt": "2026-11-06T11:28:24.657Z",
             "changeSource": "manual"
           }
         ],
         "4": [
           {
             "pair": 1,
-            "subject": "Прав обесп",
-            "teacher": "Изотова А.Р.",
-            "room": "228",
-            "subgroup": null,
-            "note": null
-          },
-          {
-            "pair": 2,
-            "subject": "Прав обесп",
-            "teacher": "Изотова А.Р.",
-            "room": "228",
-            "subgroup": null,
-            "note": null
-          },
-          {
-            "pair": 3,
-            "subject": "ГрафДизаин и Мультимедиа",
-            "teacher": "Семичева А.Г.",
-            "room": "132",
+            "subject": "Практика",
+            "teacher": "Калашников Н.В.",
+            "room": "КФЗ",
             "subgroup": null,
             "note": null,
-            "changedAt": "2026-10-30T04:25:51.091Z",
+            "changedAt": "2026-11-06T11:28:24.657Z",
             "changeSource": "manual"
           },
           {
-            "pair": 4,
-            "subject": "Прав обесп",
-            "teacher": "Изотова А.Р.",
-            "room": "288",
+            "pair": 2,
+            "subject": "Практика",
+            "teacher": "Калашников Н.В.",
+            "room": "КФЗ",
             "subgroup": null,
             "note": null,
-            "changedAt": "2026-10-30T04:25:51.091Z",
+            "changedAt": "2026-11-06T11:28:24.657Z",
+            "changeSource": "manual"
+          },
+          {
+            "pair": 3,
+            "subject": "Практика",
+            "teacher": "Калашников Н.В.",
+            "room": "КФЗ",
+            "subgroup": null,
+            "note": null,
+            "changedAt": "2026-11-06T11:28:24.657Z",
             "changeSource": "manual"
           }
         ]
       },
-      "updatedAt": "2026-10-30T04:25:51.091Z"
+      "updatedAt": "2026-11-06T11:28:24.657Z"
     }
   }
 }
