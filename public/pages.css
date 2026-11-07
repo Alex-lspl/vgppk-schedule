@@ -162,3 +162,9 @@ h1 {
 
 .btn.big { min-height: 54px; padding: 0 38px; font-size: 17px; }
 .error.center { max-width: 360px; margin: 18px auto 0; text-align: left; }
+
+/* Крутилка в кнопке, пока идёт проверка */
+@keyframes spin { to { transform: rotate(360deg); } }
+.spinner { width: 18px; height: 18px; border: 2px solid rgba(21, 21, 21, 0.25); border-top-color: currentColor; border-radius: 50%; animation: spin 0.8s linear infinite; flex-shrink: 0; }
+.btn .spinner { margin-right: 10px; }
+@media (prefers-reduced-motion: reduce) { .spinner { animation-duration: 2.4s; } }

@@ -4,6 +4,18 @@ const { hasValidSession, isSameOrigin } = require('../lib/adminAuth');
 const stats = require('../lib/stats');
 const access = require('../lib/access');
 
+const VID_COOKIE = 'vid';
+const VID_MAX_AGE = 365 * 24 * 60 * 60; // постоянный код посетителя хранится год
+const VID_RE = /^[A-Za-z0-9-]{8,64}$/;
+
+function readCookie(req, name) {
+  for (const part of (req.headers.cookie || '').split(';')) {
+    const i = part.indexOf('=');
+    if (i > 0 && part.slice(0, i).trim() === name) return part.slice(i + 1).trim();
+  }
+  return '';
+}
+
 // Адрес намеренно называется нейтрально: слово «track» есть в списках блокировщиков рекламы
 // (AdGuard, uBlock, Brave), и такие посетители просто не попадали бы в статистику.
 // Публичный эндпоинт, поэтому он ограничен: запросы только с того же origin и не чаще
@@ -86,9 +98,19 @@ module.exports = async (req, res) => {
     }
     if (!body || typeof body !== 'object') body = {};
 
+    // Постоянный код посетителя. Главный — cookie: она остаётся при смене IP (VPN, Wi-Fi ↔ мобильная
+    // сеть), поэтому человек остаётся одним и тем же без регистрации. Если cookie нет (первый заход
+    // или они отключены), берём код, который сайт хранит в браузере; новый заводим только в крайнем случае.
+    const fromCookie = readCookie(req, VID_COOKIE);
+    const vid = VID_RE.test(fromCookie) ? fromCookie : VID_RE.test(String(body.vid || '')) ? String(body.vid) : '';
+    const id = stats.visitorId({ vid, ip, ua });
+    if (vid && vid !== fromCookie) {
+      res.setHeader('Set-Cookie', `${VID_COOKIE}=${vid}; Path=/; Max-Age=${VID_MAX_AGE}; HttpOnly; Secure; SameSite=Lax`);
+    }
+
     const country = String(req.headers['x-vercel-ip-country'] || '').toUpperCase();
     await stats.record({
-      id: stats.visitorId({ vid: body.vid, ip, ua }),
+      id,
       ip,
       country: /^[A-Z]{2}$/.test(country) ? country : null,
       ua,
@@ -99,6 +121,10 @@ module.exports = async (req, res) => {
       group: stats.cleanGroup(body.group),
       type: ['load', 'ping', 'leave'].includes(body.type) ? body.type : 'ping',
     }, Date.now(), { retentionDays: ev.settings.logs.retentionDays });
+    if (vid) {
+      res.status(200).json({ vid }); // сайт запоминает этот код у себя
+      return;
+    }
   } catch (e) {
     console.error('track failed:', e.message);
   }

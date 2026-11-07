@@ -131,7 +131,8 @@
     if (turningOffSite && !confirm('Включить режим «Сайт временно не работает»? Посетители перестанут видеть расписание.')) return;
 
     $('saveBtn').disabled = true;
-    setStatus('Сохраняю…', false);
+    setStatus('', false);
+    window.Busy.show('Сохраняю…');
     request('POST', {
       action: 'settings.save',
       settings: {
@@ -148,14 +149,15 @@
     }).catch(function (e) {
       setStatus(e.message, true);
       $('saveBtn').disabled = false;
-    });
+    }).then(function () { window.Busy.hide(); });
   }
 
   function revoke() {
     if (!confirm('Выйти у всех посетителей? Им придётся ввести логин и пароль заново.')) return;
+    window.Busy.show('Выхожу у всех…');
     request('POST', { action: 'settings.revoke' }).then(function () {
       setStatus('Готово: все посетители выйдут при следующем обращении к сайту (до 15 секунд).', false);
-    }).catch(function (e) { setStatus(e.message, true); });
+    }).catch(function (e) { setStatus(e.message, true); }).then(function () { window.Busy.hide(); });
   }
 
   document.addEventListener('click', function (e) {

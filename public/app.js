@@ -577,9 +577,13 @@
     return false;
   }
 
+  const loaderHtml = (text) => `<div class="loader" role="status"><div class="spinner"></div><span>${esc(text)}</span></div>`;
+
   async function load({ manual = false } = {}) {
     if (loading || !page || view !== 'schedule') return;
     loading = true;
+    // Расписания ещё нет на экране (выбрали группу или первый заход) — показываем крутилку на его месте
+    if (!data) els.board.innerHTML = loaderHtml('Загружаю расписание…');
     els.refreshBtn.classList.add('loading');
     els.refreshBtn.disabled = true;
     let json = null;
@@ -608,7 +612,7 @@
     els.refreshBtn.classList.remove('loading');
     els.refreshBtn.disabled = false;
 
-    if (problem) { renderStatus(problem); return; }
+    if (problem) { if (!data) els.board.innerHTML = ''; renderStatus(problem); return; }
 
     data = json;
     lastCheck = new Date();
@@ -703,7 +707,7 @@
     if (!groups && groupsState === 'error') {
       msg = 'Не удалось загрузить список групп. Проверьте соединение.<br><button type="button" data-retry>Повторить</button>';
     } else if (!groups) {
-      msg = 'Загружаю список групп…';
+      msg = '<div class="loader" role="status"><div class="spinner"></div><span>Загружаю список групп…</span></div>';
     } else if (!list.length) {
       msg = 'Группы с таким номером не найдены.';
     }
@@ -771,7 +775,7 @@
     } else {
       openSchedule();
     }
-    sendSignal('ping'); // сообщить статистике новую группу (имя придёт после загрузки)
+    sendSignal('ping'); // сразу сообщаем статистике выбранную группу
   }
 
   els.groupBtn.addEventListener('click', openHome);
@@ -862,12 +866,29 @@
     return id;
   }
 
+  // Название группы для статистики: из загруженного расписания, а пока оно не пришло — из списка
+  // групп (его мы уже знаем, человек только что выбрал группу из него). Так «онлайн» сразу
+  // показывается вместе с группой, а не через 30 секунд.
+  function currentGroupName() {
+    if (data && data.name) return data.name;
+    const g = groups && groups.find((x) => x.page === page);
+    return (g && g.name) || '';
+  }
+
+  // Отдельный сигнал, если название группы стало известно или изменилось
+  let reportedGroup = '';
+  function reportGroup() {
+    const name = currentGroupName();
+    if (name && name !== reportedGroup) sendSignal('ping');
+  }
+
   function sendSignal(type) {
     try {
+      reportedGroup = currentGroupName();
       const body = JSON.stringify({
         vid: visitorId(),
         type,
-        group: (data && data.name) || '',
+        group: reportedGroup,
         // Помогают отличить телефон/планшет от компьютера, когда User-Agent их выдаёт за ПК
         touch: navigator.maxTouchPoints || 0,
         w: Math.min(screen.width || 0, screen.height || 0),
@@ -875,7 +896,13 @@
       if (type === 'leave' && navigator.sendBeacon) {
         navigator.sendBeacon('/api/visit', new Blob([body], { type: 'text/plain;charset=UTF-8' }));
       } else {
-        fetch('/api/visit', { method: 'POST', body, headers: { 'Content-Type': 'text/plain;charset=UTF-8' }, keepalive: true }).catch(() => {});
+        fetch('/api/visit', { method: 'POST', body, headers: { 'Content-Type': 'text/plain;charset=UTF-8' }, keepalive: true })
+          .then((res) => (res.ok && res.status !== 204 ? res.json() : null))
+          .then((json) => {
+            // Сервер отдаёт постоянный код посетителя (он хранится и в cookie) — запоминаем и у себя
+            if (json && json.vid && json.vid !== store.get('vid') && /^[A-Za-z0-9-]{8,64}$/.test(json.vid)) store.set('vid', json.vid);
+          })
+          .catch(() => {});
       }
     } catch { /* статистика не должна ломать сайт */ }
   }
@@ -907,11 +934,6 @@
      Группа уже выбрана на этом устройстве — сразу расписание: сначала из кэша (мгновенно),
      потом свежие данные. Не выбрана — главная со списком групп. */
 
-  // Сигнал «открыл страницу» уходит сразу, не дожидаясь загрузки расписания: на телефоне она
-  // может идти долго, а свёрнутую вкладку браузер замораживает, и сигнал бы потерялся.
-  // Название группы уйдёт со следующим сигналом, когда расписание загрузится.
-  sendSignal('load');
-
   // После перезагрузки браузер помнит служебное состояние истории «экран выбора» — сбрасываем его
   if (history.state && history.state.home) history.replaceState(null, '', location.pathname);
 
@@ -919,10 +941,16 @@
     showView('schedule');
     const cached = readCache();
     if (cached) { data = cached; render(); }
-    load().finally(() => sendSignal('ping'));
   } else {
     showView('home');
     renderTiles();
     loadGroups();
   }
+
+  // Сигнал «открыл страницу» уходит сразу, не дожидаясь загрузки расписания: на телефоне она
+  // может идти долго, а свёрнутую вкладку браузер замораживает, и сигнал бы потерялся.
+  // Название группы к этому моменту уже известно из кэша или списка групп.
+  sendSignal('load');
+
+  if (page) load().finally(reportGroup); // если из кэша имя взять не удалось — сообщим после загрузки
 })();

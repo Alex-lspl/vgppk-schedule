@@ -5,6 +5,51 @@
 (function () {
   'use strict';
 
+  // Общий индикатор «идёт загрузка» для всех страниц админки: небольшая плашка с крутилкой сверху.
+  // Busy.show('Сохраняю…') / Busy.hide(). Счётчик нужен, чтобы вложенные операции не гасили друг друга.
+  var busyCount = 0;
+  var busyEl = null;
+  window.Busy = {
+    show: function (text) {
+      busyCount += 1;
+      if (!busyEl) {
+        busyEl = document.createElement('div');
+        busyEl.className = 'busy-chip';
+        busyEl.setAttribute('role', 'status');
+        busyEl.innerHTML = '<span class="spinner sm"></span><span class="busy-text"></span>';
+        document.body.appendChild(busyEl);
+      }
+      busyEl.querySelector('.busy-text').textContent = text || 'Загрузка…';
+      busyEl.classList.add('on');
+    },
+    setText: function (text) {
+      if (busyEl) busyEl.querySelector('.busy-text').textContent = text || 'Загрузка…';
+    },
+    hide: function () {
+      busyCount = Math.max(0, busyCount - 1);
+      if (!busyCount && busyEl) busyEl.classList.remove('on');
+    },
+    reset: function () {
+      busyCount = 0;
+      if (busyEl) busyEl.classList.remove('on');
+    },
+  };
+
+  // Переход между страницами админки — это полная перезагрузка страницы (данные приходят с сервера,
+  // и это может занять время), поэтому сразу показываем, что клик сработал.
+  document.addEventListener('click', function (e) {
+    var a = e.target.closest && e.target.closest('a[href]');
+    if (!a || e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    if (a.target && a.target !== '_self') return;
+    var url;
+    try { url = new URL(a.href, location.href); } catch (err) { return; }
+    if (url.origin !== location.origin || !/^\/admin(\/|$)/.test(url.pathname)) return;
+    if (url.pathname === location.pathname && url.search === location.search) return;
+    window.Busy.show('Открываю…');
+  });
+  // Возврат кнопкой «Назад» может достать страницу из кэша браузера вместе с плашкой — убираем её
+  window.addEventListener('pageshow', function (e) { if (e.persisted) window.Busy.reset(); });
+
   var path = location.pathname.replace(/\/+$/, '') || '/';
   var current = path === '/admin/stats' ? 'stats' : path === '/admin/settings' ? 'settings' : 'schedule';
 

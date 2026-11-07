@@ -354,6 +354,7 @@ test('страницы: 404 в репозитории совпадает с ша
   assert(!/<script/i.test(file), '404 без скриптов');
   assert(pages.maintenanceHtml('<img src=x onerror=alert(1)>').includes('&lt;img src=x onerror=alert(1)&gt;'));
   assert(pages.loginHtml().includes('/gate.js'));
+  assert(!/7 дней|запомина/.test(pages.loginHtml()), 'сколько живёт вход — посетителю не пишем');
 });
 
 test('сайт лежит не в public: напрямую, минуя проверку, его не отдать', () => {
@@ -433,8 +434,6 @@ test('капча: cookie привязана к IP и сроку, админ пр
   assert.strictEqual((await access.evaluate(ipReq('5.5.5.5', { cookie }))).state, 'login');
   await settings.update({ maintenance: { enabled: true } });
   assert.strictEqual((await access.evaluate(req)).state, 'maintenance');
-  assert.strictEqual(captcha.formatTtl(24), '24 ч');
-  assert.strictEqual(captcha.formatTtl(168), '7 дн.');
 }));
 
 test('gate: страница проверки, прохождение, провал и API', withAdminEnv(async () => {
@@ -447,7 +446,7 @@ test('gate: страница проверки, прохождение, пров�
   await gate({ method: 'GET', query: {}, headers: base }, res);
   assert.strictEqual(res.code, 200);
   assert(res.body.includes('id="humanBtn"') && res.body.includes('data-challenge="') && !res.body.includes('id="homeView"'));
-  assert(res.body.includes('на 6 ч'), 'срок показан посетителю');
+  assert(!/запомина|ч\.|\d+ ч\b|дн\./.test(res.body.replace(/<script[\s\S]*?<\/script>/g, '')), 'технические подробности посетителю не показываются');
   const token = /data-challenge="([^"]+)"/.exec(res.body)[1];
 
   // API без проверки не отдаёт данные
@@ -522,4 +521,49 @@ test('боковое меню подключено на всех трёх стр
     assert(!/<script(?![^>]*\bsrc=)[^>]*>/.test(html), 'без встроенных скриптов (CSP)');
   }
   for (const f of ['nav.js', 'nav.css']) assert(fs.existsSync(path.join(__dirname, '..', 'public', 'admin-assets', f)));
+});
+
+
+/* ---------- Постоянный код посетителя ---------- */
+
+test('visit: код посетителя хранится в cookie и не меняется при смене IP', withAdminEnv(async () => {
+  const fake = setup();
+  const visit = require('../api/visit');
+  const base = { host: 'site.test', origin: 'https://site.test', 'user-agent': UA };
+  const call = (ip, body, cookie) => {
+    const res = mockRes();
+    return visit({ method: 'POST', body, headers: { ...base, 'x-forwarded-for': ip, ...(cookie ? { cookie } : {}) } }, res).then(() => res);
+  };
+
+  // первый заход: код, который хранит сайт в браузере, превращается в cookie
+  let res = await call('81.1.1.1', JSON.stringify({ vid: 'aaaaaaaa-1111', type: 'load', group: '841' }));
+  assert.strictEqual(res.code, 200);
+  assert.deepStrictEqual(res.body, { vid: 'aaaaaaaa-1111' });
+  const cookie = res.headers['set-cookie'].split(';')[0];
+  assert.strictEqual(cookie, 'vid=aaaaaaaa-1111');
+  assert(res.headers['set-cookie'].includes('HttpOnly') && res.headers['set-cookie'].includes('Max-Age=31536000'));
+
+  // тот же человек через VPN: другой IP, браузер «потерял» свой код, но cookie осталась — это он же
+  res = await call('185.9.9.9', JSON.stringify({ vid: 'zzzzzzzz-9999', type: 'ping', group: '841' }), cookie);
+  assert.deepStrictEqual(res.body, { vid: 'aaaaaaaa-1111' }, 'cookie главнее');
+  assert(!res.headers['set-cookie'], 'cookie уже верная — заново не выдаём');
+  const keys = [...fake.kv.keys()].filter((k) => k.startsWith('stats:v:'));
+  assert.deepStrictEqual(keys, ['stats:v:aaaaaaaa-1111'], 'один посетитель, а не два');
+  const rec = JSON.parse(fake.kv.get(keys[0]));
+  assert.deepStrictEqual(rec.ips.sort(), ['185.9.9.9', '81.1.1.1']);
+
+  // сигнал о группе с самого первого запроса: «онлайн» сразу с группой
+  assert(rec.groups['841']);
+}));
+
+test('код посетителя стабилен, а посетители с одного IP помечаются', () => {
+  assert.strictEqual(stats.shortCode('aaaaaaaa-1111'), stats.shortCode('aaaaaaaa-1111'));
+  assert.notStrictEqual(stats.shortCode('aaaaaaaa-1111'), stats.shortCode('bbbbbbbb-2222'));
+  assert.match(stats.shortCode('aaaaaaaa-1111'), /^[0-9A-Z]{6}$/);
+
+  const now = Date.now();
+  const mk = (id, ip) => ({ id, first: now, last: now, ip, ips: [ip], groups: { 841: now }, days: {}, kind: 'pc', os: 'Windows / ПК', browser: 'Chrome', country: 'RU' });
+  const s = stats.buildStats([mk('aaaaaaaa-1', '1.1.1.1'), mk('bbbbbbbb-2', '1.1.1.1'), mk('cccccccc-3', '2.2.2.2')], now);
+  const by = Object.fromEntries(s.visitors.map((v) => [v.id, v.sameIp]));
+  assert.deepStrictEqual(by, { 'aaaaaaaa-1': 1, 'bbbbbbbb-2': 1, 'cccccccc-3': 0 });
 });

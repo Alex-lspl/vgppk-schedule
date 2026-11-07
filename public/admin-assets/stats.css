@@ -199,10 +199,6 @@ tbody tr:hover { background: rgba(255,255,255,.02); }
 
 .panel-title.spaced { margin-bottom: 12px; }
 
-.skip-list { display: grid; gap: 8px; }
-.skip-row { padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; }
-.skip-top { display: flex; justify-content: space-between; gap: 10px; font-size: 13px; }
-.skip-sample { margin-top: 6px; font-size: 11px; color: var(--muted); word-break: break-all; }
 
 /* ---------- Очистка журнала и выбор посетителей ---------- */
 
@@ -234,3 +230,15 @@ tbody tr:hover { background: rgba(255,255,255,.02); }
   .rtable td.chk::before { content: 'Отметить'; }
 }
 .hint.spaced { margin-top: 10px; }
+
+/* ---------- Панель «Не засчитано» ---------- */
+
+.skip-list { display: grid; gap: 2px; }
+.skip-row { padding: 8px 0; border-top: 1px solid var(--line); }
+.skip-row:first-child { border-top: 0; padding-top: 0; }
+.skip-top { display: flex; justify-content: space-between; gap: 10px; font-size: 13px; }
+.skip-top b { font-variant-numeric: tabular-nums; }
+.skip-sample { margin-top: 4px; font-size: 11px; color: var(--muted); word-break: break-all; }
+.skip-empty { font-size: 13px; color: var(--muted); }
+
+.same-ip { display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 6px; background: #39332f; color: var(--muted); font-size: 11px; vertical-align: 1px; cursor: help; }

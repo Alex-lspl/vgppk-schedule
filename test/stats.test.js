@@ -180,7 +180,8 @@ test('visit: админ, чужой origin и боты не учитываютс
 
   const res = mockRes();
   await track({ ...base, headers: { ...base.headers, origin: 'https://site.test', 'x-vercel-ip-country': 'ru' } }, res);
-  assert.strictEqual(res.code, 204);
+  assert.strictEqual(res.code, 200, 'засчитанный визит возвращает постоянный код');
+  assert.deepStrictEqual(res.body, { vid: 'dddddddd-4444' });
   assert.strictEqual([...fake.kv.keys()].filter((k) => k.startsWith('stats:v:')).length, 1, 'обычный заход записан');
   const rec = JSON.parse(fake.kv.get('stats:v:dddddddd-4444'));
   assert.strictEqual(rec.country, 'RU');

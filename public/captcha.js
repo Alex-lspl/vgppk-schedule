@@ -54,7 +54,7 @@
     }
     showError('');
     btn.disabled = true;
-    btn.textContent = 'Проверяю…';
+    btn.innerHTML = '<span class="spinner"></span><span>Проверяю…</span>';
 
     var wait = new Promise(function (resolve) {
       setTimeout(resolve, Math.max(0, MIN_WAIT_MS - (Date.now() - openedAt)));

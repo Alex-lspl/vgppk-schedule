@@ -153,7 +153,7 @@ module.exports = async (req, res) => {
   }
   if (ev.state === 'captcha') {
     countShown(req);
-    sendHtml(res, 200, pages.captchaHtml(captcha.issueChallenge(req), captcha.formatTtl(ev.settings.captcha.ttlHours)));
+    sendHtml(res, 200, pages.captchaHtml(captcha.issueChallenge(req)));
     return;
   }
   if (ev.state === 'login') {

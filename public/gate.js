@@ -29,7 +29,7 @@
     }
     showError('');
     submit.disabled = true;
-    submit.textContent = 'Проверяю…';
+    submit.innerHTML = '<span class="spinner"></span><span>Проверяю…</span>';
 
     fetch('/api/gate', {
       method: 'POST',

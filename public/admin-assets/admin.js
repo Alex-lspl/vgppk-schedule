@@ -443,10 +443,20 @@
       '</div></div>';
   }
 
+  var statusBusy = false;
   function setStatus(text, kind) {
     var el = qs('statusMsg');
     el.textContent = text || '';
     el.className = 'msg' + (kind ? ' ' + kind : '');
+    // «Загрузка…» / «Сохраняю…» — показываем крутилку; любое другое сообщение её убирает
+    if (!window.Busy) return;
+    if (kind === 'busy') {
+      if (statusBusy) window.Busy.setText(text);
+      else { statusBusy = true; window.Busy.show(text); }
+    } else if (statusBusy) {
+      statusBusy = false;
+      window.Busy.hide();
+    }
   }
 
   function renderBanner() {
@@ -693,7 +703,7 @@
 
   function loadData(page, options) {
     var keepView = options && options.keepView;
-    setStatus('Загрузка…');
+    setStatus('Загрузка…', 'busy');
     return api('/api/admin-data?page=' + encodeURIComponent(page)).then(function (data) {
       state.page = page;
       state.data = data;
@@ -768,7 +778,7 @@
 
     state.busy = true;
     updateChrome();
-    setStatus('Сохраняю…');
+    setStatus('Сохраняю…', 'busy');
     postJson('/api/admin-save', { page: state.page, weeks: collected.weeks }).then(function () {
       state.busy = false;
       return loadData(state.page, { keepView: true }).then(function () {
@@ -982,7 +992,7 @@
     bindStatic();
     document.addEventListener('admin:brief', function (e) { applyBrief(e.detail); });
     if (window.AdminNav && window.AdminNav.last) applyBrief(window.AdminNav.last);
-    setStatus('Загрузка каталога…');
+    setStatus('Загрузка каталога…', 'busy');
     var page = store('admin:page') || DEFAULT_PAGE;
     var catalogReady = loadCatalog();
     loadData(page).then(function () { return catalogReady; }).then(function () {

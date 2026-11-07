@@ -77,6 +77,11 @@
     return p.length === 4 ? `${p[0]}.XX.XX.${p[3]}` : ip;
   }
 
+  // Пометка «+N»: сколько ещё посетителей (устройств) заходят с этого же IP
+  function sameIpHtml(v) {
+    return v.sameIp ? `<span class="same-ip" title="Ещё ${v.sameIp} с этим IP-адресом">+${v.sameIp}</span>` : '';
+  }
+
   function ipHtml(ip) {
     if (!ip) return '<span class="muted">—</span>';
     const open = state.revealed.has(ip);
@@ -139,7 +144,7 @@
     return `<div class="table-wrap"><table class="rtable recent"><thead><tr><th>Страна</th><th>Устройство</th><th>IP-адрес</th><th>Группа</th><th>Активность</th></tr></thead><tbody>${list.map((v) => `<tr>
       <td data-label="Страна">${countryHtml(v.country, v.browser)}</td>
       <td data-label="Устройство">${deviceHtml(v)}</td>
-      <td data-label="IP-адрес">${ipHtml(v.ip)}</td>
+      <td data-label="IP-адрес">${ipHtml(v.ip)}${sameIpHtml(v)}</td>
       <td data-label="Группа">${v.groups.length ? `<span class="group-pill">${esc(v.groups[0])}</span>` : '<span class="muted">—</span>'}</td>
       <td data-label="Активность">${rel(v.last, v.online)}</td></tr>`).join('')}</tbody></table></div>`;
   }
@@ -150,7 +155,7 @@
       ? `<div class="online-list">${list.map((v) => `<article class="person">
           <div class="person-top"><div class="person-name">${flag(v.country)}<span>Посетитель #${esc(v.short)}</span></div>${statusPill(true)}</div>
           <div class="person-row">${deviceHtml(v)}<span class="muted">${v.groups.length ? 'Группа ' + esc(v.groups[0]) : ''}</span></div>
-          <div class="person-row"><span class="muted">IP-адрес</span>${ipHtml(v.ip)}</div>
+          <div class="person-row"><span class="muted">IP-адрес</span><span>${ipHtml(v.ip)}${sameIpHtml(v)}</span></div>
           <div class="person-row">${countryHtml(v.country, v.browser)}<span class="muted">${firstSeen(v.first)}</span></div>
         </article>`).join('')}</div>`
       : empty('Сейчас никого нет на сайте');
@@ -165,20 +170,22 @@
   }
 
   const SKIP_LABELS = {
-    admin: 'Ваши собственные заходы (вы вошли в админку)',
-    bot: 'Определены как боты (по названию браузера)',
+    admin: 'Ваши заходы (вы в админке)',
+    bot: 'Боты',
     origin: 'Запросы с чужого сайта',
     'captcha-shown': 'Показана проверка «Я не робот»',
     'captcha-passed': 'Проверку прошли',
     'captcha-failed': 'Проверку не прошли',
   };
 
+  // Всегда на виду, даже когда отклонять было нечего. Пример (браузер) — во всплывающей подсказке;
+  // у ботов он показан сразу, потому что по названию бота видно, кто это.
   function skipsPanel(d) {
     const list = d.skips || [];
-    if (!list.length) return '';
-    return `<section class="panel"><div class="panel-head"><div><div class="panel-title">Не засчитано · 24 часа</div><div class="panel-meta">Сигналы, которые сервер отклонил или учёл отдельно. Хранятся только счётчики и по одному последнему примеру, не полные логи, и только сутки.</div></div></div>
-      <div class="skip-list">${list.map((x) => `<div class="skip-row"><div class="skip-top"><span>${esc(SKIP_LABELS[x.reason] || x.reason)}</span><b>${fmt(x.count)}</b></div>${x.sample ? `<div class="skip-sample">Последний пример: ${esc(x.sample)}</div>` : ''}</div>`).join('')}</div>
-      <div class="hint spaced">Число — это сигналы, а не люди: открытая страница шлёт сигнал раз в 30 секунд, поэтому один ваш открытый экран даёт десятки отметок.</div></section>`;
+    const rows = list.length
+      ? list.map((x) => `<div class="skip-row" title="${esc(x.sample || '')}"><div class="skip-top"><span>${esc(SKIP_LABELS[x.reason] || x.reason)}</span><b>${fmt(x.count)}</b></div>${x.reason === 'bot' && x.sample ? `<div class="skip-sample">${esc(x.sample)}</div>` : ''}</div>`).join('')
+      : '<div class="skip-empty">За сутки ничего</div>';
+    return `<section class="panel" id="skipsPanel"><div class="panel-head"><div><div class="panel-title">Не засчитано</div><div class="panel-meta">За последние 24 часа</div></div></div><div class="skip-list">${rows}</div></section>`;
   }
 
   function viewOverview(d) {
@@ -209,11 +216,11 @@
         </div>
         <aside>
           ${onlinePanel(d)}
+          ${skipsPanel(d)}
           <section class="panel p-countries">
             <div class="panel-head"><div><div class="panel-title">Топ стран</div><div class="panel-meta">За последние 30 дней</div></div><button class="btn small" type="button" data-goto="geo">Подробнее</button></div>
             ${geoRows(d.countries, 5)}
           </section>
-          ${skipsPanel(d)}
         </aside>
       </div>`;
   }
@@ -248,7 +255,7 @@
         <td class="chk" data-label=""><input type="checkbox" class="sel" data-id="${esc(v.id)}" aria-label="Отметить посетителя #${esc(v.short)}"${state.selected.has(v.id) ? ' checked' : ''}></td>
         <td data-label="Страна">${countryHtml(v.country, v.browser)}</td>
         <td data-label="Посетитель">#${esc(v.short)}</td>
-        <td data-label="IP-адрес"><div>${ipHtml(v.ip)}${more.length ? `<div class="ip-all">Раньше: ${esc(more.join(', '))}</div>` : ''}</div></td>
+        <td data-label="IP-адрес"><div>${ipHtml(v.ip)}${sameIpHtml(v)}${more.length ? `<div class="ip-all">Раньше: ${esc(more.join(', '))}</div>` : ''}</div></td>
         <td data-label="Устройство">${deviceHtml(v)}</td>
         <td data-label="Группы"><div>${groupPills(v.groups)}</div></td>
         <td data-label="Первый визит">${dmy(v.first)} ${hhmm(v.first)}</td>
@@ -438,6 +445,7 @@
   }
 
   async function runCleanup(body, doneText) {
+    window.Busy.show('Удаляю…');
     try {
       const r = await post(body);
       state.selected.clear();
@@ -446,6 +454,8 @@
       renderView();
     } catch (e) {
       flash(e.message, true);
+    } finally {
+      window.Busy.hide();
     }
   }
 
@@ -527,7 +537,7 @@
     if (e.target.id === 'onlineFilter') { state.online = e.target.value; $('vtable').innerHTML = visitorsTable(); }
   });
 
-  $('view').innerHTML = '<div class="empty">Загрузка…</div>';
+  $('view').innerHTML = '<div class="loader"><div class="spinner"></div><span>Загружаю статистику…</span></div>';
   if (location.hash === '#cleanup') showTab('cleanup');
   load();
   setInterval(() => { if (document.visibilityState === 'visible') load(); }, POLL_MS);
