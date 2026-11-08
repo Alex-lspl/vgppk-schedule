@@ -556,7 +556,7 @@ test('visit: код посетителя хранится в cookie и не ме
   assert(rec.groups['841']);
 }));
 
-test('код посетителя стабилен, а посетители с одного IP помечаются', () => {
+test('код посетителя стабилен, а для посетителей с одного IP показывается их общее число', () => {
   assert.strictEqual(stats.shortCode('aaaaaaaa-1111'), stats.shortCode('aaaaaaaa-1111'));
   assert.notStrictEqual(stats.shortCode('aaaaaaaa-1111'), stats.shortCode('bbbbbbbb-2222'));
   assert.match(stats.shortCode('aaaaaaaa-1111'), /^[0-9A-Z]{6}$/);
@@ -564,6 +564,6 @@ test('код посетителя стабилен, а посетители с �
   const now = Date.now();
   const mk = (id, ip) => ({ id, first: now, last: now, ip, ips: [ip], groups: { 841: now }, days: {}, kind: 'pc', os: 'Windows / ПК', browser: 'Chrome', country: 'RU' });
   const s = stats.buildStats([mk('aaaaaaaa-1', '1.1.1.1'), mk('bbbbbbbb-2', '1.1.1.1'), mk('cccccccc-3', '2.2.2.2')], now);
-  const by = Object.fromEntries(s.visitors.map((v) => [v.id, v.sameIp]));
-  assert.deepStrictEqual(by, { 'aaaaaaaa-1': 1, 'bbbbbbbb-2': 1, 'cccccccc-3': 0 });
+  const by = Object.fromEntries(s.visitors.map((v) => [v.id, v.ipCount]));
+  assert.deepStrictEqual(by, { 'aaaaaaaa-1': 2, 'bbbbbbbb-2': 2, 'cccccccc-3': 1 }, 'считается общее число с этим IP, вместе с самим посетителем');
 });

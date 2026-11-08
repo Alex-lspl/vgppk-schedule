@@ -241,4 +241,29 @@ tbody tr:hover { background: rgba(255,255,255,.02); }
 .skip-sample { margin-top: 4px; font-size: 11px; color: var(--muted); word-break: break-all; }
 .skip-empty { font-size: 13px; color: var(--muted); }
 
-.same-ip { display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 6px; background: #39332f; color: var(--muted); font-size: 11px; vertical-align: 1px; cursor: help; }
+.same-ip { display: inline-flex; align-items: center; gap: 4px; margin-left: 6px; padding: 1px 7px; border-radius: 6px; background: #39332f; color: var(--muted); font-size: 11px; vertical-align: 1px; cursor: help; }
+
+/* ---------- Группа посетителей с одного IP ---------- */
+
+.rtable tr.grp { cursor: pointer; }
+.rtable tr.grp:hover { background: #2a2622; }
+.rtable tr.grp.open { background: #2d2823; }
+
+.grp-toggle { display: inline-flex; align-items: center; gap: 8px; padding: 4px 10px 4px 6px; border: 1px solid var(--line); border-radius: 8px; background: none; color: var(--ink); font-size: 12px; cursor: pointer; }
+.grp-toggle:hover { border-color: var(--accent); }
+.grp-toggle svg { color: var(--muted); transition: transform 0.15s ease; flex-shrink: 0; }
+.rtable tr.grp.open .grp-toggle svg { transform: rotate(90deg); color: var(--accent); }
+.grp-toggle b { color: var(--accent); font-weight: 600; }
+
+.rtable tr.child { background: rgba(255, 255, 255, 0.018); }
+.rtable tr.child td:nth-child(3) { padding-left: 26px; position: relative; }
+.rtable tr.child td:nth-child(3)::before { content: ''; position: absolute; left: 12px; top: 0; bottom: 0; width: 8px; border-left: 1px solid var(--line); }
+.rtable tr.child td { font-size: 12px; }
+
+@media (max-width: 760px) {
+  .rtable td.chk { width: 100%; padding-right: 0; gap: 10px; }
+  .rtable tr.child { margin-left: 14px; width: calc(100% - 14px); border-left: 2px solid #6a4535; }
+  .rtable tr.child td:nth-child(3) { padding-left: 0; }
+  .rtable tr.child td:nth-child(3)::before { content: attr(data-label); position: static; width: auto; border: 0; }
+  .rtable tr.grp { cursor: pointer; }
+}

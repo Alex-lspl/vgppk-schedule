@@ -19,6 +19,7 @@
     phone: svg('<rect x="7" y="2.5" width="10" height="19" rx="2.5"/><path d="M11 18.5h2"/>'),
     search: svg('<circle cx="11" cy="11" r="6.5"/><path d="m16 16 4.5 4.5"/>', 15),
     download: svg('<path d="M12 4v11M7 10l5 5 5-5M5 20h14"/>', 15),
+    chev: svg('<path d="m9 6 6 6-6 6"/>', 16),
     eye: svg('<path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z"/><circle cx="12" cy="12" r="2.5"/>', 14),
   };
   const deviceIcon = (kind) => (kind === 'ios' || kind === 'android' ? ICONS.phone : ICONS.monitor);
@@ -30,6 +31,7 @@
     tab: 'overview',
     period: 7,
     revealed: new Set(), // IP, которые админ раскрыл нажатием
+    expanded: new Set(), // IP-группы, раскрытые стрелкой
     q: '',
     device: '',
     online: '',
@@ -77,9 +79,11 @@
     return p.length === 4 ? `${p[0]}.XX.XX.${p[3]}` : ip;
   }
 
-  // Пометка «+N»: сколько ещё посетителей (устройств) заходят с этого же IP
+  // Сколько всего посетителей заходит с этого IP (показываем, только если их больше одного)
+  const peopleWord = (n) => `${n} ${plural(n, 'посетитель', 'посетителя', 'посетителей')}`;
   function sameIpHtml(v) {
-    return v.sameIp ? `<span class="same-ip" title="Ещё ${v.sameIp} с этим IP-адресом">+${v.sameIp}</span>` : '';
+    if (!(v.ipCount > 1)) return '';
+    return `<span class="same-ip" title="Всего ${peopleWord(v.ipCount)} с этим IP-адресом"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c.4-3.4 2.6-5.2 6-5.2s5.6 1.8 6 5.2"/><path d="M16 5.2a3.2 3.2 0 0 1 0 5.6M18 14.9c1.8.6 2.8 2.2 3 5.1"/></svg>${v.ipCount}</span>`;
   }
 
   function ipHtml(ip) {
@@ -245,23 +249,78 @@
     return `<div class="selbar"><span>Выбрано: <b>${n}</b></span><span class="selbar-actions"><button class="btn small danger" type="button" id="delSel">Удалить выбранных</button><button class="btn small" type="button" id="clearSel">Снять выбор</button></span></div>`;
   }
 
-  function visitorsTable() {
-    const list = filteredVisitors();
-    if (!list.length) return empty(state.data.visitors.length ? 'Ничего не найдено' : 'Пока никто не заходил');
-    const allOn = list.every((v) => state.selected.has(v.id));
-    return `<div class="table-wrap"><table class="rtable"><thead><tr><th class="chk"><input type="checkbox" id="selAll" aria-label="Отметить всех в списке"${allOn ? ' checked' : ''}></th><th>Страна</th><th>Посетитель</th><th>IP-адрес</th><th>Устройство</th><th>Группы</th><th>Первый визит</th><th>Последний визит</th><th>Статус</th></tr></thead><tbody>${list.map((v) => {
-      const more = state.revealed.has(v.ip) ? v.ips.filter((x) => x !== v.ip) : [];
-      return `<tr${state.selected.has(v.id) ? ' class="selected"' : ''}>
+  // Посетители с одного IP собираются в одну строку со стрелкой: внутри — отдельные посетители
+  // (каждый определяется своим постоянным кодом). Так на сети колледжа не получается десятков одинаковых строк.
+  function groupByIp(list) {
+    const map = new Map();
+    for (const v of list) {
+      const key = v.ip || `id:${v.id}`;
+      if (!map.has(key)) map.set(key, { key, ip: v.ip, items: [] });
+      map.get(key).items.push(v);
+    }
+    return [...map.values()];
+  }
+
+  function visitorRow(v, child) {
+    const more = state.revealed.has(v.ip) ? v.ips.filter((x) => x !== v.ip) : [];
+    return `<tr class="${child ? 'child' : ''}${state.selected.has(v.id) ? ' selected' : ''}">
         <td class="chk" data-label=""><input type="checkbox" class="sel" data-id="${esc(v.id)}" aria-label="Отметить посетителя #${esc(v.short)}"${state.selected.has(v.id) ? ' checked' : ''}></td>
         <td data-label="Страна">${countryHtml(v.country, v.browser)}</td>
         <td data-label="Посетитель">#${esc(v.short)}</td>
-        <td data-label="IP-адрес"><div>${ipHtml(v.ip)}${sameIpHtml(v)}${more.length ? `<div class="ip-all">Раньше: ${esc(more.join(', '))}</div>` : ''}</div></td>
+        <td data-label="IP-адрес"><div>${ipHtml(v.ip)}${child ? '' : sameIpHtml(v)}${more.length ? `<div class="ip-all">Раньше: ${esc(more.join(', '))}</div>` : ''}</div></td>
         <td data-label="Устройство">${deviceHtml(v)}</td>
         <td data-label="Группы"><div>${groupPills(v.groups)}</div></td>
         <td data-label="Первый визит">${dmy(v.first)} ${hhmm(v.first)}</td>
         <td data-label="Последний визит">${rel(v.last, v.online)}</td>
         <td data-label="Статус">${statusPill(v.online)}</td></tr>`;
-    }).join('')}</tbody></table></div>`;
+  }
+
+  function groupRow(g) {
+    const open = state.expanded.has(g.key);
+    const picked = g.items.filter((v) => state.selected.has(v.id)).length;
+    const first = Math.min(...g.items.map((v) => v.first));
+    const last = Math.max(...g.items.map((v) => v.last));
+    const online = g.items.some((v) => v.online);
+    const systems = [...new Set(g.items.map((v) => v.os))];
+    const groups = [...new Set(g.items.flatMap((v) => v.groups))];
+    const n = g.items.length;
+    const browsers = [...new Set(g.items.map((v) => v.browser).filter(Boolean))];
+    const browserChips = browsers.slice(0, 2).map((b) => `<span class="cc">${esc(b)}</span>`).join('') + (browsers.length > 2 ? `<span class="cc">+${browsers.length - 2}</span>` : '');
+    return `<tr class="grp${open ? ' open' : ''}${picked === n ? ' selected' : ''}" data-key="${esc(g.key)}">
+        <td class="chk" data-label=""><input type="checkbox" class="selg" data-key="${esc(g.key)}" aria-label="Отметить всех с этого IP"${picked === n ? ' checked' : ''}></td>
+        <td data-label="Страна"><span class="country">${flag(g.items[0].country)}<span>${esc(countryName(g.items[0].country))}</span>${browserChips}</span></td>
+        <td data-label="Посетитель"><button class="grp-toggle" type="button" data-key="${esc(g.key)}" aria-expanded="${open}">${ICONS.chev}<span><b>${n}</b> ${plural(n, 'посетитель', 'посетителя', 'посетителей')}</span></button></td>
+        <td data-label="IP-адрес"><div>${ipHtml(g.ip)}</div></td>
+        <td data-label="Устройство"><span class="muted">${esc(systems.slice(0, 2).join(', '))}${systems.length > 2 ? '…' : ''}</span></td>
+        <td data-label="Группы"><div>${groupPills(groups.slice(0, 4))}</div></td>
+        <td data-label="Первый визит">${dmy(first)} ${hhmm(first)}</td>
+        <td data-label="Последний визит">${rel(last, online)}</td>
+        <td data-label="Статус">${statusPill(online)}</td></tr>${open ? g.items.map((v) => visitorRow(v, true)).join('') : ''}`;
+  }
+
+  function visitorsTable() {
+    const list = filteredVisitors();
+    if (!list.length) return empty(state.data.visitors.length ? 'Ничего не найдено' : 'Пока никто не заходил');
+    const allOn = list.every((v) => state.selected.has(v.id));
+    const rows = groupByIp(list).map((g) => (g.items.length > 1 ? groupRow(g) : visitorRow(g.items[0], false))).join('');
+    return `<div class="table-wrap"><table class="rtable"><thead><tr><th class="chk"><input type="checkbox" id="selAll" aria-label="Отметить всех в списке"${allOn ? ' checked' : ''}></th><th>Страна</th><th>Посетитель</th><th>IP-адрес</th><th>Устройство</th><th>Группы</th><th>Первый визит</th><th>Последний визит</th><th>Статус</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+  }
+
+  // Перерисовывает таблицу и ставит «частичную» отметку у групп, где выбраны не все посетители
+  function renderVtable() {
+    if (!$('vtable')) return;
+    $('vtable').innerHTML = visitorsTable();
+    syncGroupChecks();
+  }
+
+  function syncGroupChecks() {
+    const byKey = new Map(groupByIp(filteredVisitors()).map((g) => [g.key, g]));
+    document.querySelectorAll('.selg').forEach((el) => {
+      const g = byKey.get(el.dataset.key);
+      if (!g) return;
+      const picked = g.items.filter((v) => state.selected.has(v.id)).length;
+      el.indeterminate = picked > 0 && picked < g.items.length;
+    });
   }
 
   function viewVisitors() {
@@ -378,6 +437,7 @@
     if (!d || !d.configured) { view.innerHTML = ''; return; }
     view.innerHTML = state.tab === 'visitors' ? viewVisitors() : state.tab === 'geo' ? viewGeo(d) : state.tab === 'cleanup' ? viewCleanup(d) : viewOverview(d);
     applyDynamicStyles();
+    syncGroupChecks();
   }
 
   function showTab(name) {
@@ -405,7 +465,7 @@
     state.selected.forEach((id) => { if (!present.has(id)) state.selected.delete(id); });
     if (state.tab === 'visitors') {
       // Фильтры не пересоздаём, чтобы не сбить ввод — обновляем только таблицу
-      if ($('vtable')) { $('vtable').innerHTML = visitorsTable(); $('selbar').innerHTML = selBar(); } else renderView();
+      if ($('vtable')) { renderVtable(); $('selbar').innerHTML = selBar(); } else renderView();
     } else if (!typing) {
       renderView();
     }
@@ -497,6 +557,15 @@
     const goto = e.target.closest('[data-goto]');
     if (goto) { showTab(goto.dataset.goto); return; }
 
+    // Раскрыть / свернуть список посетителей с одного IP: стрелка или клик по строке группы
+    const grp = e.target.closest('tr.grp');
+    if (grp && !e.target.closest('.ip-btn') && !e.target.closest('input')) {
+      const key = grp.dataset.key;
+      if (state.expanded.has(key)) state.expanded.delete(key); else state.expanded.add(key);
+      renderVtable();
+      return;
+    }
+
     const ip = e.target.closest('.ip-btn');
     if (ip) {
       const v = ip.dataset.ip;
@@ -507,34 +576,38 @@
 
     if (e.target.closest('#exportBtn')) exportCsv();
     if (e.target.closest('#delSel')) deleteSelected();
-    if (e.target.closest('#clearSel')) { state.selected.clear(); $('vtable').innerHTML = visitorsTable(); $('selbar').innerHTML = selBar(); }
+    if (e.target.closest('#clearSel')) { state.selected.clear(); renderVtable(); $('selbar').innerHTML = selBar(); }
     if (e.target.closest('#purgeBtn')) purgeByPeriod();
     if (e.target.closest('#clearBtn')) clearEverything();
   });
 
   document.addEventListener('input', (e) => {
     if (e.target.id === 'purgeDays') state.purgeDays = e.target.value;
-    if (e.target.id === 'qInput') { state.q = e.target.value; $('vtable').innerHTML = visitorsTable(); }
+    if (e.target.id === 'qInput') { state.q = e.target.value; renderVtable(); }
   });
 
   document.addEventListener('change', (e) => {
     if (e.target.id === 'purgeMode') state.purgeMode = e.target.value;
     if (e.target.id === 'selAll') {
       filteredVisitors().forEach((v) => { if (e.target.checked) state.selected.add(v.id); else state.selected.delete(v.id); });
-      $('vtable').innerHTML = visitorsTable();
+      renderVtable();
+      $('selbar').innerHTML = selBar();
+    }
+    if (e.target.classList.contains('selg')) {
+      const g = groupByIp(filteredVisitors()).find((x) => x.key === e.target.dataset.key);
+      if (g) g.items.forEach((v) => { if (e.target.checked) state.selected.add(v.id); else state.selected.delete(v.id); });
+      renderVtable();
       $('selbar').innerHTML = selBar();
     }
     if (e.target.classList.contains('sel')) {
       const id = e.target.dataset.id;
       if (e.target.checked) state.selected.add(id); else state.selected.delete(id);
-      e.target.closest('tr').classList.toggle('selected', e.target.checked);
-      const all = $('selAll');
-      if (all) all.checked = filteredVisitors().every((v) => state.selected.has(v.id));
+      renderVtable(); // заодно обновит отметку группы, в которой он состоит
       $('selbar').innerHTML = selBar();
     }
     if (e.target.id === 'periodSelect') { state.period = Number(e.target.value); renderView(); }
-    if (e.target.id === 'deviceFilter') { state.device = e.target.value; $('vtable').innerHTML = visitorsTable(); }
-    if (e.target.id === 'onlineFilter') { state.online = e.target.value; $('vtable').innerHTML = visitorsTable(); }
+    if (e.target.id === 'deviceFilter') { state.device = e.target.value; renderVtable(); }
+    if (e.target.id === 'onlineFilter') { state.online = e.target.value; renderVtable(); }
   });
 
   $('view').innerHTML = '<div class="loader"><div class="spinner"></div><span>Загружаю статистику…</span></div>';
