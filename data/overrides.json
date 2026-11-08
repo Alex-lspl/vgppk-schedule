@@ -7,30 +7,30 @@
             "pair": 1,
             "subject": "Практика",
             "teacher": "Калашников Н.В.",
-            "room": "КФЗ",
+            "room": "128",
             "subgroup": null,
             "note": null,
-            "changedAt": "2026-11-06T11:28:24.657Z",
+            "changedAt": "2026-11-08T10:41:34.680Z",
             "changeSource": "manual"
           },
           {
             "pair": 2,
             "subject": "Практика",
             "teacher": "Калашников Н.В.",
-            "room": "КФЗ",
+            "room": "128",
             "subgroup": null,
             "note": null,
-            "changedAt": "2026-11-06T11:28:24.657Z",
+            "changedAt": "2026-11-08T10:41:34.680Z",
             "changeSource": "manual"
           },
           {
             "pair": 3,
             "subject": "Практика",
             "teacher": "Калашников Н.В.",
-            "room": "КФЗ",
+            "room": "128",
             "subgroup": null,
             "note": null,
-            "changedAt": "2026-11-06T11:28:24.657Z",
+            "changedAt": "2026-11-08T10:41:34.680Z",
             "changeSource": "manual"
           }
         ],
@@ -163,7 +163,7 @@
           }
         ]
       },
-      "updatedAt": "2026-11-06T11:28:24.657Z"
+      "updatedAt": "2026-11-08T10:41:34.680Z"
     }
   }
 }
