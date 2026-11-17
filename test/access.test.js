@@ -567,3 +567,167 @@ test('код посетителя стабилен, а для посетител
   const by = Object.fromEntries(s.visitors.map((v) => [v.id, v.ipCount]));
   assert.deepStrictEqual(by, { 'aaaaaaaa-1': 2, 'bbbbbbbb-2': 2, 'cccccccc-3': 1 }, 'считается общее число с этим IP, вместе с самим посетителем');
 });
+
+/* ---------- Обязательный опрос ---------- */
+
+const survey = require('../lib/survey');
+
+test('опрос: настройки проверяются', () => {
+  const cur = settings.defaults();
+  assert.deepStrictEqual(
+    { e: cur.survey.enabled, t: cur.survey.title, m: cur.survey.minChars, d: cur.survey.repeatDays },
+    { e: false, t: 'Откуда вы узнали о сайте?', m: 5, d: 30 },
+  );
+  const bad = (input, re) => assert.throws(() => settings.applyUpdate(cur, { survey: input }), (e) => e instanceof settings.ValidationError && re.test(e.message));
+  bad({ title: 'x'.repeat(151) }, /Заголовок/);
+  bad({ note: 'x'.repeat(301) }, /Пояснение/);
+  bad({ minChars: 0 }, /Минимальная/);
+  bad({ minChars: 201 }, /Минимальная/);
+  bad({ minChars: 2.5 }, /Минимальная/);
+  bad({ repeatDays: 0 }, /дней/);
+  bad({ repeatDays: 366 }, /дней/);
+  bad({ enabled: true, title: '   ' }, /напишите вопрос/);
+  const ok = settings.applyUpdate(cur, { survey: { enabled: true, title: '  Как вы нас нашли?  ', note: 'Это поможет нам', minChars: 8, repeatDays: 14 } });
+  assert.deepStrictEqual(ok.survey, { enabled: true, title: 'Как вы нас нашли?', note: 'Это поможет нам', minChars: 8, repeatDays: 14, ver: 1 });
+  assert.deepStrictEqual(Object.keys(settings.publicView(ok).survey).sort(), ['enabled', 'minChars', 'note', 'repeatDays', 'title']);
+});
+
+test('опрос: ответ проверяется — длина, пробелы, мусор', () => {
+  const v = (t, n = 5) => survey.validateAnswer(t, n);
+  assert.strictEqual(v('Друг рассказал').ok, true);
+  assert.strictEqual(v('Друг рассказал').text, 'Друг рассказал');
+  assert.strictEqual(v('   от   друга   ').text, 'от друга', 'пробелы схлопываются');
+  assert.strictEqual(v('abc').ok, false);
+  assert.match(v('abc').error, /минимум 5 символов/);
+  assert.strictEqual(v('      ab     ').ok, false, 'пробелы по краям не считаются');
+  assert.strictEqual(v('аааааааа').ok, false, 'один и тот же символ — не ответ');
+  assert.strictEqual(v('х'.repeat(501), 5).ok, false);
+  assert.strictEqual(v('я', 1).ok, true, 'при минимуме в 1 символ короткий ответ допустим');
+  assert.match(v('', 1).error, /минимум 1 символ\./);
+});
+
+test('опрос: порядок проверок и срок действия cookie', withAdminEnv(async () => {
+  setup();
+  await settings.update({ survey: { enabled: true, title: 'Откуда вы узнали о сайте?', minChars: 5, repeatDays: 10 } });
+  const req = ipReq('5.5.5.5');
+  assert.strictEqual((await access.evaluate(req)).state, 'survey');
+  assert.strictEqual((await access.evaluate(ipReq('5.5.5.5', { cookie: adminCookie() }))).state, 'open', 'админа опрос не касается');
+
+  const s = await settings.load();
+  const cookie = survey.makeCookie(s.survey.ver, 10).split(';')[0];
+  assert(survey.makeCookie(s.survey.ver, 10).includes(`Max-Age=${10 * 86400}`), 'срок — из настроек');
+  assert.strictEqual((await access.evaluate(ipReq('5.5.5.5', { cookie }))).state, 'open');
+  assert.strictEqual((await access.evaluate(ipReq('9.9.9.9', { cookie }))).state, 'open', 'опрос не привязан к IP — отвечают один раз на устройство');
+  assert.strictEqual(survey.hasAnswered({ headers: { cookie } }, s.survey.ver, Date.now() + 11 * 86400 * 1000), false, 'через N дней — снова');
+  assert.strictEqual(survey.hasAnswered({ headers: { cookie: cookie.slice(0, -2) + 'aa' } }, s.survey.ver), false, 'подпись');
+
+  await settings.reaskSurvey();
+  assert.strictEqual((await access.evaluate(ipReq('5.5.5.5', { cookie }))).state, 'survey', '«Спросить всех заново» работает');
+
+  // порядок: проверка «не робот» → вход по паролю → опрос
+  await settings.update({ captcha: { enabled: true }, access: { enabled: true, user: 'student', password: 'secret1' } });
+  assert.strictEqual((await access.evaluate(req)).state, 'captcha');
+  const human = captcha.makeCookie(req, 2).split(';')[0];
+  assert.strictEqual((await access.evaluate(ipReq('5.5.5.5', { cookie: human }))).state, 'login');
+  const visitor = access.makeCookie((await settings.load()).access.ver).split(';')[0];
+  assert.strictEqual((await access.evaluate(ipReq('5.5.5.5', { cookie: `${human}; ${visitor}` }))).state, 'survey', 'опрос — после входа');
+  await settings.update({ maintenance: { enabled: true } });
+  assert.strictEqual((await access.evaluate(req)).state, 'maintenance');
+}));
+
+test('gate: страница опроса, приём ответа, ограничения', withAdminEnv(async () => {
+  const fake = setup();
+  await settings.update({ survey: { enabled: true, title: 'Как вы узнали о <сайте>?', note: 'Это быстро', minChars: 6, repeatDays: 20 } });
+  const gate = require('../api/gate');
+  const base = { host: 'site.test', origin: 'https://site.test', 'user-agent': UA, 'x-forwarded-for': '7.7.7.7', 'x-vercel-ip-country': 'RU' };
+  const post2 = (body, extra = {}) => { const r = mockRes(); return gate({ method: 'POST', query: {}, headers: { ...base, ...extra }, body }, r).then(() => r); };
+
+  let res = mockRes();
+  await gate({ method: 'GET', query: {}, headers: base }, res);
+  assert.strictEqual(res.code, 200);
+  assert(res.body.includes('id="surveyForm"') && res.body.includes('data-min="6"') && res.body.includes('Это быстро'));
+  assert(res.body.includes('Как вы узнали о &lt;сайте&gt;?') && !res.body.includes('<сайте>'), 'вопрос экранируется');
+  assert(!res.body.includes('id="homeView"'));
+  assert(!/запомин|\d+ дн/.test(res.body.replace(/<script[\s\S]*?<\/script>/g, '')), 'технических подробностей нет');
+
+  // API без ответа закрыты
+  for (const handler of [require('../api/groups'), require('../api/schedule')]) {
+    const r = mockRes();
+    await handler({ method: 'GET', query: { page: 'bg203' }, headers: base }, r);
+    assert.deepStrictEqual([r.code, r.body.survey], [403, true]);
+  }
+
+  res = await post2({ action: 'survey', answer: 'коротко' .slice(0, 3) });
+  assert.strictEqual(res.code, 400);
+  assert(!res.headers['set-cookie']);
+  assert.strictEqual((await survey.loadAnswers()).length, 0);
+
+  res = await post2({ action: 'survey', answer: '  Рассказал   друг  ' }, { origin: 'https://evil.test' });
+  assert.strictEqual(res.code, 403, 'чужой origin');
+
+  res = await post2({ action: 'survey', answer: '  Рассказал   друг  ' });
+  assert.strictEqual(res.code, 200);
+  const cookies = res.headers['set-cookie'];
+  assert(Array.isArray(cookies) && cookies.length === 2, 'cookie ответа и код посетителя');
+  assert(cookies[0].startsWith('survey_done=') && cookies[0].includes(`Max-Age=${20 * 86400}`));
+  const vid = /^vid=([A-Za-z0-9-]+)/.exec(cookies[1])[1];
+
+  const [saved] = await survey.loadAnswers();
+  assert.strictEqual(saved.text, 'Рассказал друг');
+  assert.strictEqual(saved.question, 'Как вы узнали о <сайте>?');
+  assert.strictEqual(saved.code, stats.shortCode(vid), 'код тот же, что в списке посетителей');
+  assert.deepStrictEqual([saved.country, saved.browser, saved.os], ['RU', 'Chrome', 'Windows / ПК']);
+  assert(!JSON.stringify(saved).includes('7.7.7.7'), 'IP-адрес в ответе не хранится');
+
+  const cookie = cookies[0].split(';')[0];
+  res = mockRes();
+  await gate({ method: 'GET', query: {}, headers: { ...base, cookie } }, res);
+  assert(res.body.includes('id="homeView"'), 'после ответа открывается сайт');
+
+  res = await post2({ action: 'survey', answer: 'ещё один ответ' }, { cookie });
+  assert.strictEqual(res.code, 200, 'повторная отправка у ответившего ничего не пишет');
+  assert.strictEqual((await survey.loadAnswers()).length, 1);
+  assert(fake.kv.size >= 0);
+}));
+
+test('admin-stats: ответы — список, удаление, очистка, «спросить заново»', withAdminEnv(async () => {
+  setup();
+  const handler = require('../api/admin-stats');
+  const cookie = adminCookie();
+  const origin = { origin: 'https://site.test', cookie };
+  await settings.update({ survey: { enabled: true, title: 'Откуда?', minChars: 3 } });
+  const now = Date.now();
+  await survey.saveAnswer({ text: 'От друга', question: 'Откуда?', vid: 'aaaaaaaa-1', country: 'RU', ua: UA }, now - 2000);
+  await survey.saveAnswer({ text: 'Из Telegram', question: 'Откуда?', vid: 'bbbbbbbb-2', country: 'KZ', ua: UA }, now - 1000);
+  await survey.saveAnswer({ text: 'Из поиска', question: 'Откуда?', vid: 'cccccccc-3', country: 'DE', ua: UA }, now);
+
+  let res = mockRes();
+  await handler({ method: 'GET', query: { json: '1', view: 'answers' }, headers: { host: 'site.test' } }, res);
+  assert.strictEqual(res.code, 401, 'без сессии нельзя');
+
+  res = mockRes();
+  await handler({ method: 'GET', query: { json: '1', view: 'answers' }, headers: { host: 'site.test', cookie } }, res);
+  assert.deepStrictEqual(res.body.answers.map((a) => a.text), ['Из поиска', 'Из Telegram', 'От друга'], 'новые сверху');
+  assert.strictEqual(res.body.title, 'Откуда?');
+
+  const secondId = res.body.answers[1].id;
+  res = mockRes();
+  await handler(post({ action: 'answers.delete', ids: [secondId] }, origin), res);
+  assert.deepStrictEqual([res.code, res.body.deleted], [200, 1]);
+  assert.strictEqual((await survey.loadAnswers()).length, 2);
+
+  const before = (await settings.load({ fresh: true })).survey.ver;
+  res = mockRes();
+  await handler(post({ action: 'settings.reask' }, origin), res);
+  assert.strictEqual((await settings.load({ fresh: true })).survey.ver, before + 1);
+
+  res = mockRes();
+  await handler(post({ action: 'answers.clear' }, origin), res);
+  assert.strictEqual(res.body.deleted, 2);
+  assert.strictEqual((await survey.loadAnswers()).length, 0);
+
+  res = mockRes();
+  await handler(post({ action: 'settings.save', settings: { survey: { enabled: true, title: '', minChars: 3 } } }, origin), res);
+  assert.strictEqual(res.code, 400);
+  assert(/напишите вопрос/.test(res.body.error));
+}));

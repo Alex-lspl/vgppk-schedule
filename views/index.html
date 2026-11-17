@@ -38,8 +38,14 @@
         </button>
 
         <div class="home-intro">
-          <h1>Выберите свою группу</h1>
-          <p>Найдите свою группу, чтобы посмотреть расписание занятий.</p>
+          <h1 id="homeTitle">Выберите свою группу</h1>
+          <p id="homeLead">Найдите свою группу, чтобы посмотреть расписание занятий.</p>
+        </div>
+
+        <div class="modes" id="homeModes" role="tablist" aria-label="Что искать">
+          <button type="button" role="tab" data-mode="groups" aria-selected="true">Группы</button>
+          <button type="button" role="tab" data-mode="teachers" aria-selected="false">Преподаватели</button>
+          <button type="button" role="tab" data-mode="rooms" aria-selected="false">Кабинеты</button>
         </div>
 
         <label class="home-search">
@@ -49,8 +55,8 @@
         </label>
 
         <div class="home-meta">
-          <span class="home-meta-title">Все группы</span>
-          <span class="home-count">Доступно групп: <strong id="homeCount">…</strong></span>
+          <span class="home-meta-title" id="homeMetaTitle">Все группы</span>
+          <span class="home-count"><span id="homeCountLabel">Доступно групп</span>: <strong id="homeCount">…</strong></span>
         </div>
 
         <div class="tiles" id="tiles"></div>
@@ -61,6 +67,7 @@
     <div id="scheduleView" hidden>
     <header class="top">
       <button class="group" id="groupBtn" type="button" aria-haspopup="dialog">
+        <span class="group-kind" id="groupKind" hidden></span>
         <span class="group-num" id="groupName">…</span>
         <span class="group-hint">сменить</span>
       </button>

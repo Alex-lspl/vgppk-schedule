@@ -267,3 +267,12 @@ tbody tr:hover { background: rgba(255,255,255,.02); }
   .rtable tr.child td:nth-child(3)::before { content: attr(data-label); position: static; width: auto; border: 0; }
   .rtable tr.grp { cursor: pointer; }
 }
+.ip-n { display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 6px; background: #3a2c24; color: #e8a58a; font-size: 11px; vertical-align: 1px; cursor: help; white-space: nowrap; }
+
+/* ---------- Ответы на опрос ---------- */
+
+.head-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.rtable td.ans-text { white-space: normal; min-width: 240px; max-width: 520px; line-height: 1.45; }
+.rtable td.ans-q { white-space: normal; max-width: 220px; color: var(--muted); font-size: 12px; }
+.rtable td.ans-act { width: 40px; text-align: right; }
+@media (max-width: 760px) { .rtable td.ans-act { text-align: left; width: 100%; } .rtable td.ans-text, .rtable td.ans-q { max-width: none; } }

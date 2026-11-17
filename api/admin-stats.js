@@ -5,6 +5,7 @@ const { statsPageHtml, CONTENT_SECURITY_POLICY } = require('../lib/statsPage');
 const { settingsPageHtml } = require('../lib/settingsPage');
 const stats = require('../lib/stats');
 const settings = require('../lib/settings');
+const survey = require('../lib/survey');
 
 // Одна функция обслуживает три раздела админки (так мы укладываемся в лимит числа функций):
 //   GET  /admin/stats                    — страница статистики;
@@ -33,6 +34,15 @@ async function getSettingsJson(res) {
   res.status(200).json({ configured: stats.isConfigured(), ...settings.publicView(s) });
 }
 
+async function getAnswersJson(res) {
+  if (!stats.isConfigured()) {
+    res.status(200).json({ configured: false, answers: [] });
+    return;
+  }
+  const s = await settings.load();
+  res.status(200).json({ configured: true, enabled: s.survey.enabled, title: s.survey.title, answers: await survey.loadAnswers() });
+}
+
 async function getStatsJson(req, res) {
   const s = await settings.load();
   if (!stats.isConfigured()) {
@@ -47,6 +57,7 @@ async function getStatsJson(req, res) {
       maintenance: s.maintenance.enabled,
       restricted: s.access.enabled,
       captcha: s.captcha.enabled,
+      survey: s.survey.enabled,
     });
     return;
   }
@@ -57,7 +68,7 @@ async function getStatsJson(req, res) {
 async function handlePost(req, res) {
   const body = req.body && typeof req.body === 'object' ? req.body : {};
 
-  if (body.action && String(body.action).startsWith('stats.') && !stats.isConfigured()) {
+  if (body.action && /^(stats|answers)\./.test(String(body.action)) && !stats.isConfigured()) {
     res.status(409).json({ error: 'Статистика не подключена: нет хранилища Upstash Redis.' });
     return;
   }
@@ -92,6 +103,20 @@ async function handlePost(req, res) {
       res.status(200).json({ ok: true, purged, ...settings.publicView(saved) });
       return;
     }
+    case 'answers.delete': {
+      const ids = Array.isArray(body.ids) ? body.ids.filter((x) => typeof x === 'string') : [];
+      res.status(200).json({ ok: true, deleted: await survey.deleteAnswers(ids) });
+      return;
+    }
+    case 'answers.clear': {
+      res.status(200).json({ ok: true, deleted: await survey.clearAnswers() });
+      return;
+    }
+    case 'settings.reask': {
+      const saved = await settings.reaskSurvey();
+      res.status(200).json({ ok: true, ...settings.publicView(saved) });
+      return;
+    }
     case 'settings.revoke': {
       const saved = await settings.revokeVisitorSessions();
       res.status(200).json({ ok: true, ...settings.publicView(saved) });
@@ -119,7 +144,8 @@ module.exports = async (req, res) => {
     }
 
     if (!requireSessionApi(req, res)) return;
-    if (isSettings) await getSettingsJson(res);
+    if (req.query.view === 'answers') await getAnswersJson(res);
+    else if (isSettings) await getSettingsJson(res);
     else await getStatsJson(req, res);
   } catch (e) {
     if (e instanceof settings.ValidationError) {

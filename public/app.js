@@ -81,6 +81,12 @@
     scheduleView: $('scheduleView'),
     homeBack: $('homeBack'),
     homeBackName: $('homeBackName'),
+    homeModes: $('homeModes'),
+    homeTitle: $('homeTitle'),
+    homeLead: $('homeLead'),
+    homeMetaTitle: $('homeMetaTitle'),
+    homeCountLabel: $('homeCountLabel'),
+    groupKind: $('groupKind'),
     homeSearch: $('homeSearch'),
     homeClear: $('homeClear'),
     homeCount: $('homeCount'),
@@ -201,9 +207,17 @@
 
   /* ---------- Отрисовка ---------- */
 
+  // Что сейчас на экране: группа (по умолчанию), преподаватель или кабинет
+  const viewKind = () => (data && data.kind) || 'group';
+  const isGroupPage = () => /^bg\d+$/i.test(page);
+
   function render() {
     if (!data) return;
 
+    const kind = viewKind();
+    els.groupKind.textContent = kind === 'teacher' ? 'Преподаватель' : kind === 'room' ? 'Кабинет' : '';
+    els.groupKind.hidden = kind === 'group';
+    els.groupName.classList.toggle('long', String(data.name || '').length > 8);
     els.groupName.textContent = data.name || page;
     document.title = `Расписание ${data.name || ''}`.trim();
 
@@ -379,14 +393,25 @@
     return `${at.getUTCDate()} ${MONTHS[at.getUTCMonth()]}, ${time} МСК`;
   }
 
+  // В расписании группы справа — кабинет, под названием — преподаватель. У преподавателя под названием
+  // группа (или группы) и справа кабинет. У кабинета под названием преподаватель, а справа группа.
   function lessonHtml(l, isNow) {
-    const room = l.room
-      ? `<div class="room${l.room.length > 3 ? ' long' : ''}">${esc(l.room)}</div>`
+    const kind = viewKind();
+    let line = l.teacher;
+    let big = l.room;
+    if (kind === 'teacher') {
+      line = l.group ? `${l.group.includes(',') ? 'Группы' : 'Группа'} ${l.group}` : '';
+    } else if (kind === 'room') {
+      line = l.teacher;
+      big = l.group;
+    }
+    const room = big
+      ? `<div class="room${big.length > 3 ? ' long' : ''}">${esc(big)}</div>`
       : '<div class="room none">—</div>';
     return `<li class="lesson${isNow ? ' now' : ''}" style="--subj:${hueFor(l.subject)}">
       <div>
         <h3>${esc(l.subject)}</h3>
-        ${l.teacher ? `<p class="teacher">${esc(l.teacher)}</p>` : ''}
+        ${line ? `<p class="teacher">${esc(line)}</p>` : ''}
         ${l.subgroup && !activeSub() ? `<p class="sub-row"><span class="sub">${l.subgroup} подгруппа</span></p>` : ''}
         ${l.note ? `<p class="note">${esc(l.note)}</p>` : ''}
       </div><div class="room-cell">${changeMarkHtml(l)}${room}</div></li>`;
@@ -408,7 +433,7 @@
     let body;
     let meta = '';
     if (!pairs.length) {
-      body = '<p class="empty">В этот день пар нет</p>';
+      body = `<p class="empty">${viewKind() === 'room' ? 'Кабинет свободен весь день' : 'В этот день пар нет'}</p>`;
     } else {
       meta = `${pluralPairs(pairs.length)}, с ${pairs[0]} по ${pairs[pairs.length - 1]}`;
       const rows = [];
@@ -416,7 +441,7 @@
         if (k > 0) {
           const prev = pairs[k - 1];
           if (p - prev > 1) {
-            rows.push(`<li class="gap"><p>Окно · ${pluralPairs(p - prev - 1)}</p></li>`);
+            rows.push(`<li class="gap"><p>${viewKind() === 'room' ? 'Свободно' : 'Окно'} · ${pluralPairs(p - prev - 1)}</p></li>`);
           } else if (lunch && prev <= lunch.after && p > lunch.after) {
             rows.push(`<li class="gap lunch${lunchNow ? ' now' : ''}"><p>Обед · ${esc(lunch.time[0])}–${esc(lunch.time[1])}</p></li>`);
           }
@@ -545,6 +570,7 @@
   }
 
   function readCache() {
+    if (!isGroupPage()) return null; // расписание преподавателей и кабинетов не кэшируем
     const raw = store.get(`sched:${page}`);
     if (!raw) return null;
     try { return JSON.parse(raw); } catch { return null; }
@@ -561,11 +587,11 @@
   const savedVersion = store.get('appVersion');
   if (savedVersion) showVersion(savedVersion);
 
-  // Сервер ответил, что сайт теперь выключен (503), закрыт паролем (401) или нужна проверка «не робот» (403). Перезагружаем
+  // Сервер ответил, что сайт теперь выключен (503), закрыт паролем (401) нужна проверка «не робот» или ответ на опрос (403). Перезагружаем
   // страницу — сервер сам покажет заглушку или форму входа. Не чаще раза в 20 секунд, чтобы
   // при рассинхроне серверов не получилась бесконечная перезагрузка.
   function gateStopped(res, body) {
-    const needsGate = res.status === 401 || (res.status === 503 && body && body.maintenance) || (res.status === 403 && body && body.captcha);
+    const needsGate = res.status === 401 || (res.status === 503 && body && body.maintenance) || (res.status === 403 && body && (body.captcha || body.survey));
     if (!needsGate) return false;
     let last = 0;
     try { last = Number(sessionStorage.getItem('gateReload')) || 0; } catch { /* нет доступа к хранилищу */ }
@@ -620,7 +646,7 @@
       store.set('appVersion', json.appVersion);
       showVersion(json.appVersion);
     }
-    store.set(`sched:${page}`, JSON.stringify(json));
+    if (isGroupPage()) store.set(`sched:${page}`, JSON.stringify(json));
     render();
   }
 
@@ -689,47 +715,93 @@
   let groups = readGroupsCache(); // показываем сохранённый список сразу, свежий подтягиваем фоном
   let groupsState = groups ? 'ready' : 'loading'; // loading | ready | error
 
-  function filteredGroups() {
+  // Режимы поиска на главной. Выбор режима и выбранного преподавателя или кабинета НЕ запоминается:
+  // на них смотрят реже, чем на своё расписание, и при следующем заходе открывается своя группа.
+  const MODES = {
+    groups: {
+      title: 'Выберите свою группу', lead: 'Найдите свою группу, чтобы посмотреть расписание занятий.',
+      all: 'Все группы', count: 'Доступно групп', placeholder: 'Введите номер группы…',
+      loading: 'Загружаю список групп…', none: 'Группы с таким номером не найдены.',
+      fail: 'Не удалось загрузить список групп. Проверьте соединение.', api: '/api/groups',
+    },
+    teachers: {
+      title: 'Расписание преподавателя', lead: 'Узнайте, где и когда идут пары у преподавателя.',
+      all: 'Все преподаватели', count: 'Найдено', placeholder: 'Введите фамилию преподавателя…',
+      loading: 'Загружаю список преподавателей…', none: 'Преподаватели не найдены.',
+      fail: 'Не удалось загрузить список преподавателей. Проверьте соединение.', api: '/api/groups?type=teachers',
+    },
+    rooms: {
+      title: 'Расписание кабинета', lead: 'Узнайте, чем занят кабинет и когда он свободен.',
+      all: 'Все кабинеты', count: 'Найдено', placeholder: 'Введите номер кабинета…',
+      loading: 'Загружаю список кабинетов…', none: 'Кабинеты не найдены.',
+      fail: 'Не удалось загрузить список кабинетов. Проверьте соединение.', api: '/api/groups?type=rooms',
+    },
+  };
+
+  let homeMode = 'groups';
+  const lists = { teachers: null, rooms: null }; // списки преподавателей и кабинетов — только в памяти
+  const listState = { groups: groups ? 'ready' : 'loading', teachers: 'loading', rooms: 'loading' };
+  const listFor = (mode) => (mode === 'groups' ? groups : lists[mode]);
+
+  function filteredList() {
     const q = els.homeSearch.value.trim().toLowerCase();
-    return (groups || []).filter((g) => g.name.toLowerCase().includes(q));
+    return (listFor(homeMode) || []).filter((g) => g.name.toLowerCase().includes(q));
   }
 
   function renderTiles() {
+    const cfg = MODES[homeMode];
+    const all = listFor(homeMode);
     const q = els.homeSearch.value.trim();
     els.homeClear.hidden = !q;
-    const list = filteredGroups();
-    els.homeCount.textContent = groups ? list.length : '…';
+    const list = filteredList();
+    els.homeCount.textContent = all ? list.length : '…';
+    els.tiles.className = `tiles tiles-${homeMode}`;
     els.tiles.innerHTML = list.map((g) => (
-      `<button class="tile" type="button" data-page="${esc(g.page)}"${g.page === page ? ' aria-current="true"' : ''}>${esc(g.name)}</button>`
+      `<button class="tile" type="button" data-page="${esc(g.page)}"${homeMode === 'groups' && g.page === page ? ' aria-current="true"' : ''}>${esc(g.name)}</button>`
     )).join('');
 
     let msg = '';
-    if (!groups && groupsState === 'error') {
-      msg = 'Не удалось загрузить список групп. Проверьте соединение.<br><button type="button" data-retry>Повторить</button>';
-    } else if (!groups) {
-      msg = '<div class="loader" role="status"><div class="spinner"></div><span>Загружаю список групп…</span></div>';
+    if (!all && listState[homeMode] === 'error') {
+      msg = `${esc(cfg.fail)}<br><button type="button" data-retry>Повторить</button>`;
+    } else if (!all) {
+      msg = `<div class="loader" role="status"><div class="spinner"></div><span>${esc(cfg.loading)}</span></div>`;
     } else if (!list.length) {
-      msg = 'Группы с таким номером не найдены.';
+      msg = esc(cfg.none);
     }
     els.homeEmpty.innerHTML = msg;
     els.homeEmpty.hidden = !msg;
   }
 
-  async function loadGroups() {
-    groupsState = groups ? 'ready' : 'loading';
-    renderTiles();
+  async function loadList(mode = homeMode) {
+    const cfg = MODES[mode];
+    listState[mode] = listFor(mode) ? 'ready' : 'loading';
+    if (mode === homeMode) renderTiles();
     try {
-      const res = await fetch('/api/groups');
+      const res = await fetch(cfg.api);
       const json = await res.json();
       if (gateStopped(res, json)) return;
       if (!res.ok || !Array.isArray(json.groups)) throw new Error(json.error || 'bad response');
-      groups = json.groups.slice().sort(byName);
-      store.set(GROUPS_KEY, JSON.stringify(groups));
-      groupsState = 'ready';
+      const sorted = json.groups.slice().sort(byName);
+      if (mode === 'groups') { groups = sorted; store.set(GROUPS_KEY, JSON.stringify(groups)); } else lists[mode] = sorted;
+      listState[mode] = 'ready';
     } catch {
-      if (!groups) groupsState = 'error'; // есть сохранённый список — молча пользуемся им
+      if (!listFor(mode)) listState[mode] = 'error'; // есть сохранённый список — молча пользуемся им
     }
+    if (mode === homeMode) renderTiles();
+  }
+
+  function setMode(mode) {
+    homeMode = mode;
+    const cfg = MODES[mode];
+    els.homeModes.querySelectorAll('[data-mode]').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.mode === mode)));
+    els.homeTitle.textContent = cfg.title;
+    els.homeLead.textContent = cfg.lead;
+    els.homeMetaTitle.textContent = cfg.all;
+    els.homeCountLabel.textContent = cfg.count;
+    els.homeSearch.placeholder = cfg.placeholder;
+    els.homeSearch.value = '';
     renderTiles();
+    if (listState[mode] !== 'ready') loadList(mode);
   }
 
   function showView(name) {
@@ -744,11 +816,11 @@
   function openHome() {
     if (view === 'home') return;
     if (page) history.pushState({ home: true }, '', location.pathname);
-    els.homeSearch.value = '';
     els.homeBack.hidden = !page;
     els.homeBackName.textContent = (data && data.name) || '';
     showView('home');
-    loadGroups();
+    setMode('groups'); // режим не запоминается — каждый раз начинаем с групп
+    loadList('groups');
     // На телефоне сразу выезжающая клавиатура мешает выбрать из списка — фокус только на компьютере
     if (!matchMedia('(pointer: coarse)').matches) els.homeSearch.focus();
   }
@@ -778,28 +850,49 @@
     sendSignal('ping'); // сразу сообщаем статистике выбранную группу
   }
 
+  // Преподаватель или кабинет: открываем расписание, но выбор не запоминаем (не пишем в localStorage),
+  // поэтому при следующем заходе или обновлении страницы откроется своя группа.
+  function chooseEntity(p) {
+    page = p;
+    data = null;
+    viewWeek = null;
+    els.board.innerHTML = '';
+    els.days.innerHTML = '';
+    els.statusText.textContent = 'Загружаю расписание…';
+    if (location.search) history.replaceState(history.state, '', location.pathname);
+    if (history.state && history.state.home) history.back();
+    else openSchedule();
+    sendSignal('ping');
+  }
+
+  const choose = (p) => (homeMode === 'groups' ? chooseGroup(p) : chooseEntity(p));
+
   els.groupBtn.addEventListener('click', openHome);
+  els.homeModes.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-mode]');
+    if (b && b.dataset.mode !== homeMode) setMode(b.dataset.mode);
+  });
   els.homeBack.addEventListener('click', () => { if (history.state && history.state.home) history.back(); else openSchedule(); });
   els.homeSearch.addEventListener('input', renderTiles);
   els.homeSearch.addEventListener('keydown', (e) => {
     if (e.key !== 'Enter') return;
-    const first = filteredGroups()[0];
-    if (first && els.homeSearch.value.trim()) chooseGroup(first.page);
+    const first = filteredList()[0];
+    if (first && els.homeSearch.value.trim()) choose(first.page);
   });
   els.homeClear.addEventListener('click', () => { els.homeSearch.value = ''; els.homeSearch.focus(); renderTiles(); });
   els.tiles.addEventListener('click', (e) => {
     const b = e.target.closest('[data-page]');
-    if (b) chooseGroup(b.dataset.page);
+    if (b) choose(b.dataset.page);
   });
-  els.homeEmpty.addEventListener('click', (e) => { if (e.target.closest('[data-retry]')) loadGroups(); });
+  els.homeEmpty.addEventListener('click', (e) => { if (e.target.closest('[data-retry]')) loadList(homeMode); });
 
   window.addEventListener('popstate', () => {
     if (history.state && history.state.home) {
       els.homeBack.hidden = !page;
       els.homeBackName.textContent = (data && data.name) || '';
       showView('home');
-      renderTiles();
-      loadGroups();
+      setMode('groups');
+      loadList('groups');
     } else if (page) {
       openSchedule();
     }
@@ -870,6 +963,7 @@
   // групп (его мы уже знаем, человек только что выбрал группу из него). Так «онлайн» сразу
   // показывается вместе с группой, а не через 30 секунд.
   function currentGroupName() {
+    if (!isGroupPage()) return ''; // преподаватели и кабинеты в статистику групп не попадают
     if (data && data.name) return data.name;
     const g = groups && groups.find((x) => x.page === page);
     return (g && g.name) || '';
@@ -943,8 +1037,8 @@
     if (cached) { data = cached; render(); }
   } else {
     showView('home');
-    renderTiles();
-    loadGroups();
+    setMode('groups');
+    loadList('groups');
   }
 
   // Сигнал «открыл страницу» уходит сразу, не дожидаясь загрузки расписания: на телефоне она

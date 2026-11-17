@@ -92,6 +92,29 @@
       '</section>' +
 
       '<section class="panel">' +
+        '<div class="panel-head"><div><div class="panel-title">Обязательный опрос' + badge(cfg.survey.enabled, 'включено') + '</div>' +
+        '<div class="panel-meta">Вопрос, на который нужно ответить, чтобы попасть на сайт</div></div></div>' +
+        '<label class="switch"><input type="checkbox" id="sEnabled"' + (cfg.survey.enabled ? ' checked' : '') + dis + '>' +
+          '<span class="track"></span>' +
+          '<span class="label">Просить ответить на вопрос при заходе на сайт' +
+            '<small>Пока посетитель не напишет ответ нужной длины, на сайт он не попадёт. Вас, пока вошли в админку, опрос не касается. Ответы смотрите в статистике → «Ответы».</small></span></label>' +
+        '<div class="group" id="sGroup">' +
+          '<div class="row"><label for="sTitle">Вопрос (заголовок)</label>' +
+            '<input class="field" id="sTitle" type="text" maxlength="150" value="' + esc(cfg.survey.title) + '"' + dis + '></div>' +
+          '<div class="row"><label for="sNote">Пояснение под заголовком (необязательно)</label>' +
+            '<textarea class="field" id="sNote" maxlength="300"' + dis + '>' + esc(cfg.survey.note) + '</textarea></div>' +
+          '<div class="cols">' +
+            '<div class="row num"><label for="sMin">Минимум символов в ответе</label>' +
+              '<input class="field" id="sMin" type="number" min="1" max="200" step="1" inputmode="numeric" value="' + esc(cfg.survey.minChars) + '"' + dis + '></div>' +
+            '<div class="row num"><label for="sDays">Спрашивать снова через, дней</label>' +
+              '<input class="field" id="sDays" type="number" min="1" max="365" step="1" inputmode="numeric" value="' + esc(cfg.survey.repeatDays) + '"' + dis + '></div>' +
+          '</div>' +
+          '<div class="hint">Кто уже ответил, увидит вопрос снова только через указанное число дней. Нужно спросить всех прямо сейчас (например, вы поменяли вопрос) — нажмите кнопку ниже.</div>' +
+          '<div><button class="btn small danger" type="button" id="reaskBtn"' + dis + '>Спросить всех заново</button></div>' +
+        '</div>' +
+      '</section>' +
+
+      '<section class="panel">' +
         '<div class="panel-head"><div><div class="panel-title">Журнал посещений</div>' +
         '<div class="panel-meta">Сколько хранить записи о посетителях</div></div></div>' +
         '<div class="row num"><label for="lDays">Хранить, дней</label>' +
@@ -112,6 +135,7 @@
     $('mGroup').classList.toggle('off', !$('mEnabled').checked);
     $('aGroup').classList.toggle('off', !$('aEnabled').checked);
     $('cGroup').classList.toggle('off', !$('cEnabled').checked);
+    $('sGroup').classList.toggle('off', !$('sEnabled').checked);
   }
 
   function updateCount() {
@@ -139,11 +163,12 @@
         maintenance: { enabled: $('mEnabled').checked, message: $('mMessage').value },
         access: { enabled: $('aEnabled').checked, user: $('aUser').value, password: $('aPass').value },
         captcha: { enabled: $('cEnabled').checked, ttlHours: Number($('cHours').value) },
+        survey: { enabled: $('sEnabled').checked, title: $('sTitle').value, note: $('sNote').value, minChars: Number($('sMin').value), repeatDays: Number($('sDays').value) },
         logs: { retentionDays: Number($('lDays').value) },
       },
     }).then(function (json) {
       var purged = json.purged ? ' Удалено старых записей журнала: ' + json.purged + '.' : '';
-      cfg = { configured: true, maintenance: json.maintenance, access: json.access, captcha: json.captcha, logs: json.logs };
+      cfg = { configured: true, maintenance: json.maintenance, access: json.access, captcha: json.captcha, survey: json.survey, logs: json.logs };
       status = { text: 'Сохранено. Изменения заработают в течение 15 секунд.' + purged, error: false };
       render();
     }).catch(function (e) {
@@ -160,12 +185,21 @@
     }).catch(function (e) { setStatus(e.message, true); }).then(function () { window.Busy.hide(); });
   }
 
+  function reask() {
+    if (!confirm('Спросить всех заново? Опрос увидят и те, кто уже отвечал.')) return;
+    window.Busy.show('Сбрасываю…');
+    request('POST', { action: 'settings.reask' }).then(function () {
+      setStatus('Готово: опрос покажется всем заново (до 15 секунд).', false);
+    }).catch(function (e) { setStatus(e.message, true); }).then(function () { window.Busy.hide(); });
+  }
+
   document.addEventListener('click', function (e) {
     if (e.target.closest('#saveBtn')) save();
     if (e.target.closest('#revokeBtn')) revoke();
+    if (e.target.closest('#reaskBtn')) reask();
   });
   document.addEventListener('change', function (e) {
-    if (e.target.id === 'mEnabled' || e.target.id === 'aEnabled' || e.target.id === 'cEnabled') syncGroups();
+    if (e.target.id === 'mEnabled' || e.target.id === 'aEnabled' || e.target.id === 'cEnabled' || e.target.id === 'sEnabled') syncGroups();
   });
   document.addEventListener('input', function (e) {
     if (e.target.id === 'mMessage') updateCount();

@@ -32,6 +32,7 @@
     period: 7,
     revealed: new Set(), // IP, которые админ раскрыл нажатием
     expanded: new Set(), // IP-группы, раскрытые стрелкой
+    answers: null, // ответы на обязательный опрос (загружаются при открытии вкладки)
     q: '',
     device: '',
     online: '',
@@ -84,6 +85,14 @@
   function sameIpHtml(v) {
     if (!(v.ipCount > 1)) return '';
     return `<span class="same-ip" title="Всего ${peopleWord(v.ipCount)} с этим IP-адресом"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c.4-3.4 2.6-5.2 6-5.2s5.6 1.8 6 5.2"/><path d="M16 5.2a3.2 3.2 0 0 1 0 5.6M18 14.9c1.8.6 2.8 2.2 3 5.1"/></svg>${v.ipCount}</span>`;
+  }
+
+  // Один и тот же посетитель заходил с нескольких IP (VPN, другая сеть) — число видно сразу,
+  // не раскрывая адрес
+  function ipCountHtml(v) {
+    return v.ips && v.ips.length > 1
+      ? `<span class="ip-n" title="Заходил с ${v.ips.length} разных IP-адресов. Нажмите на адрес, чтобы увидеть все">${v.ips.length} IP</span>`
+      : '';
   }
 
   function ipHtml(ip) {
@@ -148,7 +157,7 @@
     return `<div class="table-wrap"><table class="rtable recent"><thead><tr><th>Страна</th><th>Устройство</th><th>IP-адрес</th><th>Группа</th><th>Активность</th></tr></thead><tbody>${list.map((v) => `<tr>
       <td data-label="Страна">${countryHtml(v.country, v.browser)}</td>
       <td data-label="Устройство">${deviceHtml(v)}</td>
-      <td data-label="IP-адрес">${ipHtml(v.ip)}${sameIpHtml(v)}</td>
+      <td data-label="IP-адрес">${ipHtml(v.ip)}${ipCountHtml(v)}${sameIpHtml(v)}</td>
       <td data-label="Группа">${v.groups.length ? `<span class="group-pill">${esc(v.groups[0])}</span>` : '<span class="muted">—</span>'}</td>
       <td data-label="Активность">${rel(v.last, v.online)}</td></tr>`).join('')}</tbody></table></div>`;
   }
@@ -159,7 +168,7 @@
       ? `<div class="online-list">${list.map((v) => `<article class="person">
           <div class="person-top"><div class="person-name">${flag(v.country)}<span>Посетитель #${esc(v.short)}</span></div>${statusPill(true)}</div>
           <div class="person-row">${deviceHtml(v)}<span class="muted">${v.groups.length ? 'Группа ' + esc(v.groups[0]) : ''}</span></div>
-          <div class="person-row"><span class="muted">IP-адрес</span><span>${ipHtml(v.ip)}${sameIpHtml(v)}</span></div>
+          <div class="person-row"><span class="muted">IP-адрес</span><span>${ipHtml(v.ip)}${ipCountHtml(v)}${sameIpHtml(v)}</span></div>
           <div class="person-row">${countryHtml(v.country, v.browser)}<span class="muted">${firstSeen(v.first)}</span></div>
         </article>`).join('')}</div>`
       : empty('Сейчас никого нет на сайте');
@@ -267,7 +276,7 @@
         <td class="chk" data-label=""><input type="checkbox" class="sel" data-id="${esc(v.id)}" aria-label="Отметить посетителя #${esc(v.short)}"${state.selected.has(v.id) ? ' checked' : ''}></td>
         <td data-label="Страна">${countryHtml(v.country, v.browser)}</td>
         <td data-label="Посетитель">#${esc(v.short)}</td>
-        <td data-label="IP-адрес"><div>${ipHtml(v.ip)}${child ? '' : sameIpHtml(v)}${more.length ? `<div class="ip-all">Раньше: ${esc(more.join(', '))}</div>` : ''}</div></td>
+        <td data-label="IP-адрес"><div>${ipHtml(v.ip)}${ipCountHtml(v)}${child ? '' : sameIpHtml(v)}${more.length ? `<div class="ip-all">Раньше: ${esc(more.join(', '))}</div>` : ''}</div></td>
         <td data-label="Устройство">${deviceHtml(v)}</td>
         <td data-label="Группы"><div>${groupPills(v.groups)}</div></td>
         <td data-label="Первый визит">${dmy(v.first)} ${hhmm(v.first)}</td>
@@ -355,6 +364,62 @@
     setTimeout(() => URL.revokeObjectURL(a.href), 1000);
   }
 
+  /* ---------- Ответы на опрос ---------- */
+
+  async function loadAnswers() {
+    try {
+      const res = await fetch('/api/admin-stats?json=1&view=answers', { cache: 'no-store' });
+      if (res.status === 401) { location.href = '/admin'; return; }
+      state.answers = await res.json();
+    } catch { /* оставляем прежний список */ }
+    if (state.tab === 'answers') renderView();
+  }
+
+  function viewAnswers() {
+    const a = state.answers;
+    if (!a) return '<div class="loader"><div class="spinner"></div><span>Загружаю ответы…</span></div>';
+    const list = a.answers || [];
+    const head = `<div class="panel-head"><div><div class="panel-title">Ответы на опрос</div>
+      <div class="panel-meta">${list.length ? `Всего: ${fmt(list.length)}` : 'Пока нет ответов'}${a.enabled ? '' : ' · опрос сейчас выключен'} · вопрос: «${esc(a.title || '')}»</div></div>
+      <div class="head-actions">${list.length ? '<button class="btn small" type="button" id="ansExport">Экспорт CSV</button><button class="btn small danger" type="button" id="ansClear">Удалить все</button>' : ''}</div></div>`;
+    if (!list.length) return `<div class="panel">${head}${empty('Ответов пока нет')}</div>`;
+    const rows = list.map((x) => `<tr>
+        <td data-label="Время">${dmy(x.at)} ${hhmm(x.at)}</td>
+        <td data-label="Посетитель">${x.code ? `#${esc(x.code)}` : '—'}</td>
+        <td data-label="Откуда">${countryHtml(x.country, x.browser)}</td>
+        <td data-label="Вопрос" class="ans-q">${esc(x.question || '')}</td>
+        <td data-label="Ответ" class="ans-text">${esc(x.text)}</td>
+        <td class="ans-act"><button class="btn small danger ans-del" type="button" data-id="${esc(x.id)}" aria-label="Удалить ответ">×</button></td></tr>`).join('');
+    return `<div class="panel">${head}<div class="table-wrap"><table class="rtable"><thead><tr><th>Время</th><th>Посетитель</th><th>Откуда</th><th>Вопрос</th><th>Ответ</th><th></th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
+  }
+
+  function exportAnswers() {
+    const q = (s) => `"${String(s == null ? '' : s).replace(/"/g, '""')}"`;
+    const rows = [['Время', 'Посетитель', 'Страна', 'Браузер', 'Вопрос', 'Ответ']];
+    (state.answers.answers || []).forEach((x) => rows.push([`${dmy(x.at)} ${hhmm(x.at)}`, x.code ? `#${x.code}` : '', countryName(x.country), x.browser || '', x.question || '', x.text]));
+    const csv = '\uFEFF' + rows.map((r) => r.map(q).join(';')).join('\r\n');
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+    a.download = `answers-${dmy(Date.now()).split('.').reverse().join('-')}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  }
+
+  async function removeAnswers(body, text) {
+    window.Busy.show('Удаляю…');
+    try {
+      const r = await post(body);
+      flash(`${text}: ${r.deleted}.`, false);
+      await loadAnswers();
+    } catch (e) {
+      flash(e.message, true);
+    } finally {
+      window.Busy.hide();
+    }
+  }
+
   /* ---------- Очистка ---------- */
 
   function purgeTargets(mode, days) {
@@ -435,13 +500,14 @@
     const d = state.data;
     const view = $('view');
     if (!d || !d.configured) { view.innerHTML = ''; return; }
-    view.innerHTML = state.tab === 'visitors' ? viewVisitors() : state.tab === 'geo' ? viewGeo(d) : state.tab === 'cleanup' ? viewCleanup(d) : viewOverview(d);
+    view.innerHTML = state.tab === 'visitors' ? viewVisitors() : state.tab === 'geo' ? viewGeo(d) : state.tab === 'cleanup' ? viewCleanup(d) : state.tab === 'answers' ? viewAnswers() : viewOverview(d);
     applyDynamicStyles();
     syncGroupChecks();
   }
 
   function showTab(name) {
     state.tab = name;
+    if (name === 'answers') loadAnswers();
     document.querySelectorAll('.tab').forEach((t) => t.classList.toggle('active', t.dataset.tab === name));
     renderView();
     window.scrollTo({ top: 0 });
@@ -577,6 +643,12 @@
     if (e.target.closest('#exportBtn')) exportCsv();
     if (e.target.closest('#delSel')) deleteSelected();
     if (e.target.closest('#clearSel')) { state.selected.clear(); renderVtable(); $('selbar').innerHTML = selBar(); }
+    if (e.target.closest('#ansExport')) exportAnswers();
+    if (e.target.closest('#ansClear')) {
+      if (confirm(`Удалить все ответы (${state.answers.answers.length})? Это нельзя отменить.`)) removeAnswers({ action: 'answers.clear' }, 'Удалено ответов');
+    }
+    const ansDel = e.target.closest('.ans-del');
+    if (ansDel && confirm('Удалить этот ответ?')) removeAnswers({ action: 'answers.delete', ids: [ansDel.dataset.id] }, 'Удалено ответов');
     if (e.target.closest('#purgeBtn')) purgeByPeriod();
     if (e.target.closest('#clearBtn')) clearEverything();
   });
@@ -613,6 +685,6 @@
   $('view').innerHTML = '<div class="loader"><div class="spinner"></div><span>Загружаю статистику…</span></div>';
   if (location.hash === '#cleanup') showTab('cleanup');
   load();
-  setInterval(() => { if (document.visibilityState === 'visible') load(); }, POLL_MS);
+  setInterval(() => { if (document.visibilityState === 'visible') { load(); if (state.tab === 'answers') loadAnswers(); } }, POLL_MS);
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') load(); });
 })();

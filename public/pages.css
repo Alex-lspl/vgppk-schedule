@@ -168,3 +168,22 @@ h1 {
 .spinner { width: 18px; height: 18px; border: 2px solid rgba(21, 21, 21, 0.25); border-top-color: currentColor; border-radius: 50%; animation: spin 0.8s linear infinite; flex-shrink: 0; }
 .btn .spinner { margin-right: 10px; }
 @media (prefers-reduced-motion: reduce) { .spinner { animation-duration: 2.4s; } }
+
+/* ---------- Опрос ---------- */
+
+.field textarea {
+  width: 100%;
+  min-height: 110px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--ink);
+  font: 400 16px/1.45 var(--font-body);
+  resize: vertical;
+  outline: 0;
+}
+.field textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(217, 119, 87, 0.12); }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+.count { min-height: 16px; font-size: 12px; color: var(--muted); text-align: right; }
+.count.ok { color: #86c79b; }

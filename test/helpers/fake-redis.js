@@ -11,6 +11,8 @@ module.exports = function makeFake() {
     async mget(...keys) { calls.push('mget'); return keys.map((k) => (kv.has(k) ? auto(kv.get(k)) : null)); },
     async hincrby(k, f, n) { calls.push('hincrby'); if (!h.has(k)) h.set(k, {}); h.get(k)[f] = (Number(h.get(k)[f]) || 0) + n; return h.get(k)[f]; },
     async hset(k, obj) { calls.push('hset'); if (!h.has(k)) h.set(k, {}); Object.assign(h.get(k), obj); return Object.keys(obj).length; },
+    async hlen(k) { calls.push('hlen'); return h.has(k) ? Object.keys(h.get(k)).length : 0; },
+    async hdel(k, ...fields) { calls.push('hdel'); let n = 0; if (h.has(k)) for (const f of fields) if (f in h.get(k)) { delete h.get(k)[f]; n++; } return n; },
     async hgetall(k) { calls.push('hgetall'); return h.has(k) ? { ...h.get(k) } : null; },
     async expire(k, sec) { calls.push('expire'); ttl.set(k, sec); return 1; },
     async del(...keys) { calls.push('del'); let n = 0; for (const k of keys) { if (kv.delete(k)) n++; if (z.delete(k)) n++; if (h.delete(k)) n++; } return n; },

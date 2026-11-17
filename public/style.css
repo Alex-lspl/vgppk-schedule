@@ -858,3 +858,43 @@ button:disabled { cursor: progress; }
   .tiles { gap: 7px; }
   .tile { min-height: 52px; font-size: 17px; }
 }
+
+/* ---------- Режимы поиска на главной и вид расписания преподавателя / кабинета ---------- */
+
+.modes {
+  display: flex;
+  gap: 4px;
+  max-width: 460px;
+  margin: 0 auto 18px;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+}
+
+.modes button {
+  flex: 1;
+  min-width: 0;
+  padding: 10px 8px;
+  border: 0;
+  border-radius: 9px;
+  background: none;
+  color: var(--muted);
+  font: 500 14px/1.1 var(--font-body);
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.modes button:hover { color: var(--ink); }
+.modes button[aria-selected="true"] { background: var(--accent); color: #151515; font-weight: 600; }
+
+.tiles-teachers { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); }
+.tiles-teachers .tile { min-height: 54px; font: 600 15px/1.25 var(--font-body); letter-spacing: 0; }
+
+.group-kind { align-self: center; font-size: 11px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--accent); white-space: nowrap; }
+.group-num.long { font-size: clamp(16px, 4.6vw, 22px); line-height: 1.2; }
+
+@media (max-width: 650px) {
+  .modes button { padding: 10px 4px; font-size: 13px; }
+  .tiles-teachers { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .tiles-teachers .tile { font-size: 14px; }
+}
