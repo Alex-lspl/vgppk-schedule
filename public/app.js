@@ -87,6 +87,9 @@
     homeMetaTitle: $('homeMetaTitle'),
     homeCountLabel: $('homeCountLabel'),
     groupKind: $('groupKind'),
+    lookupBtn: $('lookupBtn'),
+    mineBtn: $('mineBtn'),
+    mineName: $('mineName'),
     homeSearch: $('homeSearch'),
     homeClear: $('homeClear'),
     homeCount: $('homeCount'),
@@ -112,6 +115,13 @@
   // Группа: из адреса (?page=…) или запомненная на этом устройстве. Если её нет — человек
   // впервые на сайте, и вместо расписания показывается главная с выбором группы.
   let page = new URLSearchParams(location.search).get('page') || store.get('page') || '';
+  // «Моя группа» живёт отдельно от того, что сейчас на экране: пока человек смотрит преподавателя
+  // или кабинет (page — чужая страница), выбранная группа и её расписание (myPage, myData) не теряются.
+  const isGroupId = (p) => /^bg\d+$/i.test(p || '');
+  let myPage = isGroupId(page) ? page : (isGroupId(store.get('page')) ? store.get('page') : '');
+  let myData = null;
+  let homeFlow = 'change'; // 'change' — выбрать свою группу, 'lookup' — только посмотреть преподавателя или кабинет
+  let homeReturn = null; // состояние истории, с которого открыли главную
   let view = 'schedule'; // 'home' | 'schedule'
   let data = null;
   let mySub = Number(store.get('sub')) || null; // null = показывать всех
@@ -211,12 +221,33 @@
   const viewKind = () => (data && data.kind) || 'group';
   const isGroupPage = () => /^bg\d+$/i.test(page);
 
+  // Кнопки под шапкой: на своей группе — «Преподаватели и кабинеты», на чужом расписании — «Моя группа …»
+  function syncNav() {
+    const viewing = page !== myPage; // на экране не моя группа
+    els.lookupBtn.hidden = viewing;
+    els.mineBtn.hidden = !viewing || !myPage;
+    els.mineName.textContent = myPage ? mineName() : '';
+  }
+
+  // Пока расписание грузится, в шапке уже показываем то, что выбрали (название берём из списка)
+  function previewHeader(p) {
+    const kind = /^cp/i.test(p) ? 'Преподаватель' : /^ca/i.test(p) ? 'Кабинет' : '';
+    const item = [...(lists.teachers || []), ...(lists.rooms || []), ...(groups || [])].find((x) => x.page === p);
+    els.groupKind.textContent = kind;
+    els.groupKind.hidden = !kind;
+    els.groupBtn.classList.toggle('has-kind', !!kind);
+    els.groupName.classList.toggle('long', String(item ? item.name : '').length > 8);
+    els.groupName.textContent = item ? item.name : '…';
+  }
+
   function render() {
     if (!data) return;
 
     const kind = viewKind();
     els.groupKind.textContent = kind === 'teacher' ? 'Преподаватель' : kind === 'room' ? 'Кабинет' : '';
     els.groupKind.hidden = kind === 'group';
+    els.groupBtn.classList.toggle('has-kind', kind !== 'group');
+    syncNav();
     els.groupName.classList.toggle('long', String(data.name || '').length > 8);
     els.groupName.textContent = data.name || page;
     document.title = `Расписание ${data.name || ''}`.trim();
@@ -397,12 +428,14 @@
   // группа (или группы) и справа кабинет. У кабинета под названием преподаватель, а справа группа.
   function lessonHtml(l, isNow) {
     const kind = viewKind();
-    let line = l.teacher;
+    let lines = [l.teacher];
     let big = l.room;
     if (kind === 'teacher') {
-      line = l.group ? `${l.group.includes(',') ? 'Группы' : 'Группа'} ${l.group}` : '';
+      // Как в обычном расписании: под названием предмета — кто ведёт пару, затем группа
+      const group = l.group ? `${l.group.includes(',') ? 'Группы' : 'Группа'} ${l.group}` : '';
+      lines = [l.teacher || (data && data.name) || '', group];
     } else if (kind === 'room') {
-      line = l.teacher;
+      lines = [l.teacher];
       big = l.group;
     }
     const room = big
@@ -411,7 +444,7 @@
     return `<li class="lesson${isNow ? ' now' : ''}" style="--subj:${hueFor(l.subject)}">
       <div>
         <h3>${esc(l.subject)}</h3>
-        ${line ? `<p class="teacher">${esc(line)}</p>` : ''}
+        ${lines.filter(Boolean).map((t) => `<p class="teacher">${esc(t)}</p>`).join('')}
         ${l.subgroup && !activeSub() ? `<p class="sub-row"><span class="sub">${l.subgroup} подгруппа</span></p>` : ''}
         ${l.note ? `<p class="note">${esc(l.note)}</p>` : ''}
       </div><div class="room-cell">${changeMarkHtml(l)}${room}</div></li>`;
@@ -614,6 +647,7 @@
     els.refreshBtn.disabled = true;
     let json = null;
     let problem = null;
+    const reqPage = page; // пока шёл запрос, человек мог перейти на другую страницу
     try {
       let res;
       try {
@@ -621,7 +655,7 @@
         // Ручное обновление — не чаще раза в минуту на всех, автоматическое — раз в 30 минут
         // или раз в 2 часа в зависимости от времени суток (см. autoRefreshMs).
         const bucket = Math.floor(Date.now() / (manual ? 60000 : autoRefreshMs()));
-        res = await fetch(`/api/schedule?page=${encodeURIComponent(page)}&t=${bucket}${manual ? 'm' : ''}`, { cache: 'no-cache' });
+        res = await fetch(`/api/schedule?page=${encodeURIComponent(reqPage)}&t=${bucket}${manual ? 'm' : ''}`, { cache: 'no-cache' });
       } catch {
         throw new Error('Нет связи с сервером.');
       }
@@ -637,6 +671,8 @@
     loading = false;
     els.refreshBtn.classList.remove('loading');
     els.refreshBtn.disabled = false;
+
+    if (page !== reqPage) { load(); return; } // ответ от прежней страницы не показываем — грузим нужную
 
     if (problem) { if (!data) els.board.innerHTML = ''; renderStatus(problem); return; }
 
@@ -743,9 +779,18 @@
   const listState = { groups: groups ? 'ready' : 'loading', teachers: 'loading', rooms: 'loading' };
   const listFor = (mode) => (mode === 'groups' ? groups : lists[mode]);
 
+  // Название кабинета в списке колледжа может содержать закреплённого преподавателя (это удобно при
+  // составлении расписания вручную), но искать кабинет нужно только по номеру: берём из названия
+  // номера («359», «12а», «3/4»). Если цифр нет («Спортзал»), ищем по всему названию.
+  function roomNumber(name) {
+    const nums = String(name).match(/\d+(?:[/-]\d+)?[а-яё]?/giu);
+    return nums ? nums.join(' ') : String(name);
+  }
+
   function filteredList() {
     const q = els.homeSearch.value.trim().toLowerCase();
-    return (listFor(homeMode) || []).filter((g) => g.name.toLowerCase().includes(q));
+    const key = homeMode === 'rooms' ? (g) => roomNumber(g.name) : (g) => g.name;
+    return (listFor(homeMode) || []).filter((g) => key(g).toLowerCase().includes(q));
   }
 
   function renderTiles() {
@@ -813,14 +858,24 @@
 
   // Главная открывается как отдельный «экран» истории: кнопка «Назад» на телефоне
   // возвращает к расписанию, а не уводит с сайта.
-  function openHome() {
-    if (view === 'home') return;
-    if (page) history.pushState({ home: true }, '', location.pathname);
+  // flow 'change' — выбрать свою группу (можно и заглянуть к преподавателю или в кабинет);
+  // flow 'lookup' — только посмотреть преподавателя или кабинет, группа при этом не меняется.
+  function renderHome(flow) {
+    homeFlow = flow;
     els.homeBack.hidden = !page;
     els.homeBackName.textContent = (data && data.name) || '';
+    els.homeModes.querySelector('[data-mode="groups"]').hidden = flow === 'lookup';
     showView('home');
-    setMode('groups'); // режим не запоминается — каждый раз начинаем с групп
-    loadList('groups');
+    // режим не запоминается: «выбрать группу» всегда начинается с групп, «посмотреть» — с последнего вида
+    setMode(flow === 'lookup' ? (viewKind() === 'room' ? 'rooms' : 'teachers') : 'groups');
+    if (flow === 'change') loadList('groups');
+  }
+
+  function openHome(flow = 'change') {
+    if (view === 'home') return;
+    homeReturn = history.state || null;
+    if (page) history.pushState({ home: true }, '', location.pathname);
+    renderHome(flow);
     // На телефоне сразу выезжающая клавиатура мешает выбрать из списка — фокус только на компьютере
     if (!matchMedia('(pointer: coarse)').matches) els.homeSearch.focus();
   }
@@ -831,43 +886,92 @@
     load();
   }
 
+  const clearBoard = () => {
+    els.board.innerHTML = '';
+    els.days.innerHTML = '';
+    els.statusText.textContent = 'Загружаю расписание…';
+  };
+
+  // Название своей группы для кнопки «Моя группа …»
+  function mineName() {
+    if (!myPage) return '';
+    if (page === myPage && data && data.name) return data.name;
+    if (myData && myData.name) return myData.name;
+    const g = groups && groups.find((x) => x.page === myPage);
+    return (g && g.name) || '';
+  }
+
+  // Сменить свою группу: запоминается на устройстве
   function chooseGroup(p) {
-    if (p !== page) {
+    if (p !== page || p !== myPage) {
       page = p;
+      myPage = p;
+      myData = null;
       data = null;
       viewWeek = null;
-      els.board.innerHTML = '';
-      els.days.innerHTML = '';
-      els.statusText.textContent = 'Загружаю расписание…';
+      clearBoard();
+      previewHeader(p);
+      syncNav();
     }
     store.set('page', page); // запоминаем выбор на этом устройстве
     if (location.search) history.replaceState(history.state, '', location.pathname);
     if (history.state && history.state.home) {
-      history.back(); // popstate вернёт на экран расписания и загрузит его
+      // Если главную открыли поверх чужого расписания (преподаватель, кабинет), шаг назад вернул бы
+      // его — поэтому просто заменяем запись истории
+      if (homeReturn && homeReturn.entity) { history.replaceState(null, '', location.pathname); openSchedule(); }
+      else history.back(); // popstate вернёт на экран расписания и загрузит его
     } else {
       openSchedule();
     }
     sendSignal('ping'); // сразу сообщаем статистике выбранную группу
   }
 
-  // Преподаватель или кабинет: открываем расписание, но выбор не запоминаем (не пишем в localStorage),
-  // поэтому при следующем заходе или обновлении страницы откроется своя группа.
-  function chooseEntity(p) {
+  // Преподаватель или кабинет: только посмотреть. Своя группа (myPage и её расписание) остаётся,
+  // в localStorage ничего не пишется, расписание не кэшируется — при обновлении страницы
+  // откроется своя группа.
+  function showEntity(p) {
+    if (page === myPage && data) myData = data;
     page = p;
     data = null;
     viewWeek = null;
-    els.board.innerHTML = '';
-    els.days.innerHTML = '';
-    els.statusText.textContent = 'Загружаю расписание…';
-    if (location.search) history.replaceState(history.state, '', location.pathname);
-    if (history.state && history.state.home) history.back();
-    else openSchedule();
+    clearBoard();
+    previewHeader(p);
+    syncNav();
+    openSchedule();
+  }
+
+  function chooseEntity(p) {
+    const st = { entity: p };
+    if (history.state && history.state.home) history.replaceState(st, '', location.pathname);
+    else history.pushState(st, '', location.pathname);
+    showEntity(p);
+    sendSignal('ping');
+  }
+
+  // Назад к своей группе из чужого расписания
+  function showMine() {
+    if (!myPage) { renderHome('change'); return; }
+    page = myPage;
+    data = myData || readCache();
+    viewWeek = null;
+    clearBoard();
+    previewHeader(myPage);
+    syncNav();
+    showView('schedule');
+    if (data) render();
+    load();
     sendSignal('ping');
   }
 
   const choose = (p) => (homeMode === 'groups' ? chooseGroup(p) : chooseEntity(p));
 
-  els.groupBtn.addEventListener('click', openHome);
+  // Заголовок: на своей группе — сменить группу, на преподавателе или кабинете — выбрать другого
+  els.groupBtn.addEventListener('click', () => openHome(page === myPage || !myPage ? 'change' : 'lookup'));
+  els.lookupBtn.addEventListener('click', () => openHome('lookup'));
+  els.mineBtn.addEventListener('click', () => {
+    showMine();
+    if (history.state && history.state.entity) history.replaceState(null, '', location.pathname);
+  });
   els.homeModes.addEventListener('click', (e) => {
     const b = e.target.closest('[data-mode]');
     if (b && b.dataset.mode !== homeMode) setMode(b.dataset.mode);
@@ -887,12 +991,14 @@
   els.homeEmpty.addEventListener('click', (e) => { if (e.target.closest('[data-retry]')) loadList(homeMode); });
 
   window.addEventListener('popstate', () => {
-    if (history.state && history.state.home) {
-      els.homeBack.hidden = !page;
-      els.homeBackName.textContent = (data && data.name) || '';
-      showView('home');
-      setMode('groups');
-      loadList('groups');
+    const st = history.state || {};
+    if (st.home) {
+      renderHome(homeFlow);
+    } else if (st.entity) {
+      if (page !== st.entity) showEntity(st.entity);
+      else openSchedule();
+    } else if (myPage && page !== myPage) {
+      showMine();
     } else if (page) {
       openSchedule();
     }
@@ -963,10 +1069,9 @@
   // групп (его мы уже знаем, человек только что выбрал группу из него). Так «онлайн» сразу
   // показывается вместе с группой, а не через 30 секунд.
   function currentGroupName() {
-    if (!isGroupPage()) return ''; // преподаватели и кабинеты в статистику групп не попадают
-    if (data && data.name) return data.name;
-    const g = groups && groups.find((x) => x.page === page);
-    return (g && g.name) || '';
+    // Преподаватели и кабинеты в статистику групп не попадают: пока человек смотрит их,
+    // по-прежнему сообщаем его собственную группу
+    return mineName();
   }
 
   // Отдельный сигнал, если название группы стало известно или изменилось
@@ -1029,7 +1134,7 @@
      потом свежие данные. Не выбрана — главная со списком групп. */
 
   // После перезагрузки браузер помнит служебное состояние истории «экран выбора» — сбрасываем его
-  if (history.state && history.state.home) history.replaceState(null, '', location.pathname);
+  if (history.state && (history.state.home || history.state.entity)) history.replaceState(null, '', location.pathname);
 
   if (page) {
     showView('schedule');

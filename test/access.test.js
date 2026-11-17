@@ -709,6 +709,18 @@ test('admin-stats: ответы — список, удаление, очистк
   await handler({ method: 'GET', query: { json: '1', view: 'answers' }, headers: { host: 'site.test', cookie } }, res);
   assert.deepStrictEqual(res.body.answers.map((a) => a.text), ['Из поиска', 'Из Telegram', 'От друга'], 'новые сверху');
   assert.strictEqual(res.body.title, 'Откуда?');
+  assert(res.body.answers.every((a) => a.ip === null && Array.isArray(a.ips)), 'без записи в журнале посетителей IP пустой');
+
+  // IP подтягивается из журнала посетителей по коду; в самом ответе он не хранится
+  const stats = require('../lib/stats');
+  await stats.record({ id: 'aaaaaaaa-1', ip: '95.10.20.42', country: 'RU', ua: UA, group: '841', type: 'load' }, now);
+  await stats.record({ id: 'aaaaaaaa-1', ip: '95.10.20.43', country: 'RU', ua: UA, group: '841', type: 'load' }, now + 10);
+  await stats.record({ id: 'dddddddd-4', ip: '95.10.20.43', country: 'RU', ua: UA, group: '841', type: 'load' }, now + 20);
+  res = mockRes();
+  await handler({ method: 'GET', query: { json: '1', view: 'answers' }, headers: { host: 'site.test', cookie } }, res);
+  const withIp = res.body.answers.find((a) => a.text === 'От друга');
+  assert.deepStrictEqual([withIp.ip, withIp.ips.length, withIp.ipCount], ['95.10.20.43', 2, 2]);
+  assert(!(JSON.stringify(await survey.loadAnswers())).includes('95.10.20'), 'в хранилище ответов IP нет');
 
   const secondId = res.body.answers[1].id;
   res = mockRes();

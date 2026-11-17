@@ -40,7 +40,7 @@ async function getAnswersJson(res) {
     return;
   }
   const s = await settings.load();
-  res.status(200).json({ configured: true, enabled: s.survey.enabled, title: s.survey.title, answers: await survey.loadAnswers() });
+  res.status(200).json({ configured: true, enabled: s.survey.enabled, title: s.survey.title, answers: survey.attachIps(await survey.loadAnswers(), await stats.loadVisitors()) });
 }
 
 async function getStatsJson(req, res) {

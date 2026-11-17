@@ -383,20 +383,23 @@
       <div class="panel-meta">${list.length ? `Всего: ${fmt(list.length)}` : 'Пока нет ответов'}${a.enabled ? '' : ' · опрос сейчас выключен'} · вопрос: «${esc(a.title || '')}»</div></div>
       <div class="head-actions">${list.length ? '<button class="btn small" type="button" id="ansExport">Экспорт CSV</button><button class="btn small danger" type="button" id="ansClear">Удалить все</button>' : ''}</div></div>`;
     if (!list.length) return `<div class="panel">${head}${empty('Ответов пока нет')}</div>`;
+    // Как во вкладке «Посетители»: после раскрытия IP видны и прежние адреса
+    const more = (x) => { const o = state.revealed.has(x.ip) ? (x.ips || []).filter((i) => i !== x.ip) : []; return o.length ? `<div class="ip-all">Раньше: ${esc(o.join(', '))}</div>` : ''; };
     const rows = list.map((x) => `<tr>
         <td data-label="Время">${dmy(x.at)} ${hhmm(x.at)}</td>
         <td data-label="Посетитель">${x.code ? `#${esc(x.code)}` : '—'}</td>
+        <td data-label="IP-адрес"><div>${ipHtml(x.ip)}${ipCountHtml(x)}${sameIpHtml(x)}${more(x)}</div></td>
         <td data-label="Откуда">${countryHtml(x.country, x.browser)}</td>
         <td data-label="Вопрос" class="ans-q">${esc(x.question || '')}</td>
         <td data-label="Ответ" class="ans-text">${esc(x.text)}</td>
         <td class="ans-act"><button class="btn small danger ans-del" type="button" data-id="${esc(x.id)}" aria-label="Удалить ответ">×</button></td></tr>`).join('');
-    return `<div class="panel">${head}<div class="table-wrap"><table class="rtable"><thead><tr><th>Время</th><th>Посетитель</th><th>Откуда</th><th>Вопрос</th><th>Ответ</th><th></th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
+    return `<div class="panel">${head}<div class="table-wrap"><table class="rtable"><thead><tr><th>Время</th><th>Посетитель</th><th>IP-адрес</th><th>Откуда</th><th>Вопрос</th><th>Ответ</th><th></th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
   }
 
   function exportAnswers() {
     const q = (s) => `"${String(s == null ? '' : s).replace(/"/g, '""')}"`;
-    const rows = [['Время', 'Посетитель', 'Страна', 'Браузер', 'Вопрос', 'Ответ']];
-    (state.answers.answers || []).forEach((x) => rows.push([`${dmy(x.at)} ${hhmm(x.at)}`, x.code ? `#${x.code}` : '', countryName(x.country), x.browser || '', x.question || '', x.text]));
+    const rows = [['Время', 'Посетитель', 'IP-адрес', 'Страна', 'Браузер', 'Вопрос', 'Ответ']];
+    (state.answers.answers || []).forEach((x) => rows.push([`${dmy(x.at)} ${hhmm(x.at)}`, x.code ? `#${x.code}` : '', x.ip || '', countryName(x.country), x.browser || '', x.question || '', x.text]));
     const csv = '\uFEFF' + rows.map((r) => r.map(q).join(';')).join('\r\n');
     const a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));

@@ -890,7 +890,53 @@ button:disabled { cursor: progress; }
 .tiles-teachers { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); }
 .tiles-teachers .tile { min-height: 54px; font: 600 15px/1.25 var(--font-body); letter-spacing: 0; }
 
-.group-kind { align-self: center; font-size: 11px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--accent); white-space: nowrap; }
+/* Подпись «Преподаватель» / «Кабинет» — такая же «таблетка», как «сменить» справа, но в цвете акцента,
+   чтобы не спорить с крупным названием по размеру и весу */
+.group-kind {
+  align-self: center;
+  flex-shrink: 0;
+  padding: 3px 10px;
+  border: 1px solid var(--accent);
+  border-radius: 999px;
+  background: rgba(217, 119, 87, 0.12);
+  font: 600 12px/1.3 var(--font-body);
+  color: var(--accent);
+  white-space: nowrap;
+}
+
+/* У преподавателя и кабинета подпись стоит отдельной строкой над названием, а не в одну линию с ним:
+   так длинная фамилия не ломается посреди слова на узком экране */
+.group.has-kind {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas: "kind kind" "num hint";
+  align-items: center;
+  row-gap: 6px;
+}
+.group.has-kind .group-kind { grid-area: kind; justify-self: start; }
+.group.has-kind .group-num { grid-area: num; }
+.group.has-kind .group-hint { grid-area: hint; }
+
+/* Кнопки под шапкой: «Преподаватели и кабинеты» и «Моя группа …» */
+.subnav { margin: 0 0 10px; }
+
+.subnav-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 38px;
+  padding: 8px 14px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--muted);
+  font: 500 13px/1.2 var(--font-body);
+  transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+
+.subnav-btn:hover { color: var(--ink); border-color: var(--accent); background: var(--surface-2); }
+.subnav-btn b { color: var(--accent); font-weight: 600; }
+.subnav-btn[hidden] { display: none; }
 .group-num.long { font-size: clamp(16px, 4.6vw, 22px); line-height: 1.2; }
 
 @media (max-width: 650px) {

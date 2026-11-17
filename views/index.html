@@ -77,6 +77,17 @@
       </button>
     </header>
 
+    <div class="subnav">
+      <button class="subnav-btn" id="lookupBtn" type="button">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+        <span>Преподаватели и кабинеты</span>
+      </button>
+      <button class="subnav-btn" id="mineBtn" type="button" hidden>
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>
+        <span>Моя группа <b id="mineName"></b></span>
+      </button>
+    </div>
+
     <button class="status" id="statusBtn" type="button" role="status" aria-live="polite" aria-haspopup="dialog">
       <span id="statusText">Загружаю расписание…</span>
       <svg class="status-i" viewBox="0 0 20 20" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="10" cy="10" r="8.2"/><path d="M10 9.2v5" stroke-linecap="round"/><circle cx="10" cy="6.3" r="0.9" fill="currentColor" stroke="none"/></svg>
