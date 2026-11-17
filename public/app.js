@@ -236,8 +236,9 @@
     els.groupKind.textContent = kind;
     els.groupKind.hidden = !kind;
     els.groupBtn.classList.toggle('has-kind', !!kind);
-    els.groupName.classList.toggle('long', String(item ? item.name : '').length > 8);
-    els.groupName.textContent = item ? item.name : '…';
+    const nm = item ? shownName(p, item.name) : '…';
+    els.groupName.classList.toggle('long', nm.length > 8);
+    els.groupName.textContent = nm;
   }
 
   function render() {
@@ -248,9 +249,10 @@
     els.groupKind.hidden = kind === 'group';
     els.groupBtn.classList.toggle('has-kind', kind !== 'group');
     syncNav();
-    els.groupName.classList.toggle('long', String(data.name || '').length > 8);
-    els.groupName.textContent = data.name || page;
-    document.title = `Расписание ${data.name || ''}`.trim();
+    const title = shownName(page, data.name);
+    els.groupName.classList.toggle('long', title.length > 8);
+    els.groupName.textContent = title || page;
+    document.title = `Расписание ${title}`.trim();
 
     const nums = weekNumbers();
     if (viewWeek === null || !nums.includes(viewWeek)) resetView();
@@ -435,8 +437,10 @@
       const group = l.group ? `${l.group.includes(',') ? 'Группы' : 'Группа'} ${l.group}` : '';
       lines = [l.teacher || (data && data.name) || '', group];
     } else if (kind === 'room') {
-      lines = [l.teacher];
-      big = l.group;
+      // Как везде: крупно — кабинет (тот, что выбран), под предметом — кто ведёт и какая группа
+      const group = l.group ? `${l.group.includes(',') ? 'Группы' : 'Группа'} ${l.group}` : '';
+      lines = [l.teacher, group];
+      big = shownName(page, data && data.name);
     }
     const room = big
       ? `<div class="room${big.length > 3 ? ' long' : ''}">${esc(big)}</div>`
@@ -779,13 +783,17 @@
   const listState = { groups: groups ? 'ready' : 'loading', teachers: 'loading', rooms: 'loading' };
   const listFor = (mode) => (mode === 'groups' ? groups : lists[mode]);
 
-  // Название кабинета в списке колледжа может содержать закреплённого преподавателя (это удобно при
-  // составлении расписания вручную), но искать кабинет нужно только по номеру: берём из названия
-  // номера («359», «12а», «3/4»). Если цифр нет («Спортзал»), ищем по всему названию.
+  // Название кабинета в списке колледжа может содержать закреплённого преподавателя («111 Барбашина Л.В.»,
+  // «320 Маст.1») — это нужно для ручного составления расписания, но посетителям не показывается:
+  // и в списке, и в заголовке, и при поиске кабинет — только его номер («359», «12а», «3/4»).
+  // Если цифр нет («кф з», «Спортзал»), остаётся название целиком.
   function roomNumber(name) {
-    const nums = String(name).match(/\d+(?:[/-]\d+)?[а-яё]?/giu);
-    return nums ? nums.join(' ') : String(name);
+    const m = String(name).match(/\d+(?:[/-]\d+)?[а-яё]?/iu);
+    return m ? m[0] : String(name).trim();
   }
+
+  // Как показывать название: у кабинетов (страницы ca…) — без фамилии
+  const shownName = (pg, name) => (/^ca/i.test(pg) ? roomNumber(name) : String(name || ''));
 
   function filteredList() {
     const q = els.homeSearch.value.trim().toLowerCase();
@@ -802,7 +810,7 @@
     els.homeCount.textContent = all ? list.length : '…';
     els.tiles.className = `tiles tiles-${homeMode}`;
     els.tiles.innerHTML = list.map((g) => (
-      `<button class="tile" type="button" data-page="${esc(g.page)}"${homeMode === 'groups' && g.page === page ? ' aria-current="true"' : ''}>${esc(g.name)}</button>`
+      `<button class="tile" type="button" data-page="${esc(g.page)}"${homeMode === 'groups' && g.page === page ? ' aria-current="true"' : ''}>${esc(shownName(g.page, g.name))}</button>`
     )).join('');
 
     let msg = '';
@@ -863,7 +871,7 @@
   function renderHome(flow) {
     homeFlow = flow;
     els.homeBack.hidden = !page;
-    els.homeBackName.textContent = (data && data.name) || '';
+    els.homeBackName.textContent = (data && shownName(page, data.name)) || '';
     els.homeModes.querySelector('[data-mode="groups"]').hidden = flow === 'lookup';
     showView('home');
     // режим не запоминается: «выбрать группу» всегда начинается с групп, «посмотреть» — с последнего вида
